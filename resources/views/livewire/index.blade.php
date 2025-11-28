@@ -113,7 +113,7 @@ new class extends Component {
         $query = Transaksi::with(['details'])
             ->whereBetween('tanggal', [$start, $end])
             ->where('type', 'Kredit');
-            // ->where('status', 'Lunas');
+        // ->where('status', 'Lunas');
         if ($this->selectedKategoriPendapatan) {
             $query->whereHas('details', fn($q) => $q->where('barang_id', $this->selectedKategoriPendapatan));
         }
@@ -171,7 +171,7 @@ new class extends Component {
         $query = Transaksi::with(['details'])
             ->whereBetween('tanggal', [$start, $end])
             ->where('type', 'Stok');
-            // ->where('status', 'Lunas');
+        // ->where('status', 'Lunas');
 
         if ($this->selectedKategoriPengeluaran) {
             $query->whereHas('details', fn($q) => $q->where('barang_id', $this->selectedKategoriPengeluaran));
@@ -392,6 +392,29 @@ new class extends Component {
         return Barang::whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])->count();
     }
 
+    public function hutangPenjualan(): int
+    {
+        return Transaksi::where('type', 'Kredit')
+            ->where('status', 'Hutang')
+            ->whereBetween('tanggal', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+            ->count();
+    }
+
+    public function hutangPembelian(): int
+    {
+        return Transaksi::where('type', 'Stok')
+            ->where('status', 'Hutang')
+            ->whereBetween('tanggal', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+            ->count();
+    }
+
+    public function minimumStok(): int
+    {
+        return Barang::where('stok', '<=', 5)
+            ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+            ->count();
+    }
+
     public function updatedSelectedKategoriPendapatan()
     {
         $this->chartPendapatan();
@@ -409,6 +432,9 @@ new class extends Component {
             'expenseTotal' => $this->expenseTotal(),
             'assetTotal' => $this->assetTotal(),
             'liabiliatsTotal' => $this->liabiliatsTotal(),
+            'hutangPenjualan' => $this->hutangPenjualan(),
+            'hutangPembelian' => $this->hutangPembelian(),
+            'minimumStok' => $this->minimumStok(),
             'startDate' => $this->startDate,
             'endDate' => $this->endDate,
         ];
@@ -478,10 +504,10 @@ new class extends Component {
         <!-- Pendapatan -->
         <x-card class="rounded-lg shadow p-4">
             <div class="flex items-center justify-center gap-3">
-                <x-icon name="fas.money-bill-wave" class="text-purple-500 w-10 h-10 shrink-0" />
+                <x-icon name="fas.coins" class="text-purple-500 w-10 h-10 shrink-0" />
                 <div>
-                    <p class="text-sm">Total Penjualan</p>
-                    <p class="text-xl font-bold">Rp. {{ number_format($incomeTotal) }}</p>
+                    <p class="text-sm">Hutang Penjualan</p>
+                    <p class="text-xl font-bold">{{ number_format($hutangPenjualan) }}</p>
                 </div>
             </div>
         </x-card>
@@ -489,10 +515,10 @@ new class extends Component {
         <!-- Pengeluaran -->
         <x-card class="rounded-lg shadow p-4">
             <div class="flex items-center justify-center gap-3">
-                <x-icon name="fas.shopping-bag" class="text-blue-500 w-10 h-10 shrink-0" />
+                <x-icon name="fas.basket-shopping" class="text-blue-500 w-10 h-10 shrink-0" />
                 <div>
-                    <p class="text-sm">Total Pembelian</p>
-                    <p class="text-xl font-bold">Rp. {{ number_format($expenseTotal) }}</p>
+                    <p class="text-sm">Hutang Pembelian</p>
+                    <p class="text-xl font-bold">{{ number_format($hutangPembelian) }}</p>
                 </div>
             </div>
         </x-card>
@@ -511,70 +537,122 @@ new class extends Component {
         <!-- Liabilitas -->
         <x-card class="rounded-lg shadow p-4">
             <div class="flex items-center justify-center gap-3">
-                <x-icon name="fas.box" class="text-yellow-500 w-10 h-10 shrink-0" />
+                <x-icon name="fas.dolly" class="text-yellow-500 w-10 h-10 shrink-0" />
                 <div>
-                    <p class="text-sm">Total Barang</p>
-                    <p class="text-xl font-bold">{{ number_format($liabiliatsTotal) }}</p>
+                    <p class="text-sm">Stok Minimum</p>
+                    <p class="text-xl font-bold">{{ number_format($minimumStok) }}</p>
                 </div>
             </div>
         </x-card>
     </div>
 
-    <!-- CHARTS -->
-    <div class="grid grid-cols-1 lg:grid-cols-10 gap-4">
-        <x-card class="col-span-10 overflow-x-auto">
-            <x-slot:title>Grafik Penjualan</x-slot:title>
-            <x-slot:menu>
-                <x-choices-offline label="Pilih Barang Penjualan" wire:model.live="selectedKategoriPendapatan"
-                    :options="collect($kategoriPendapatanList)
-                        ->map(fn($k) => ['id' => $k['id'], 'name' => $k['name']])
-                        ->prepend(['id' => null, 'name' => 'Semua Penjualan'])" option-value="id" option-label="name" single searchable class="w-full md:w-64" />
-            </x-slot:menu>
-            <div class="w-full min-w-[320px]">
-                <x-chart wire:model="pendapatanChart" />
-            </div>
-        </x-card>
+    @if (Auth::user()->role_id == 1 || Auth::user()->role_id == 2)
+        <!-- GRID UTAMA -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Pendapatan -->
+            <x-card class="rounded-lg shadow p-4">
+                <div class="flex items-center justify-center gap-3">
+                    <x-icon name="fas.money-bill-wave" class="text-purple-500 w-10 h-10 shrink-0" />
+                    <div>
+                        <p class="text-sm">Total Penjualan</p>
+                        <p class="text-xl font-bold">Rp. {{ number_format($incomeTotal) }}</p>
+                    </div>
+                </div>
+            </x-card>
 
-        <x-card class="col-span-10 overflow-x-auto">
-            <x-slot:title>Grafik Pembelian</x-slot:title>
-            <x-slot:menu>
-                <x-choices-offline label="Pilih Barang Pembelian" wire:model.live="selectedKategoriPengeluaran"
-                    :options="collect($kategoriPengeluaranList)
-                        ->map(fn($k) => ['id' => $k['id'], 'name' => $k['name']])
-                        ->prepend(['id' => null, 'name' => 'Semua Pembelian'])" option-value="id" option-label="name" single searchable class="w-full md:w-64" />
-            </x-slot:menu>
-            <div class="w-full min-w-[320px]">
-                <x-chart wire:model="pengeluaranChart" />
-            </div>
-        </x-card>
+            <!-- Pengeluaran -->
+            <x-card class="rounded-lg shadow p-4">
+                <div class="flex items-center justify-center gap-3">
+                    <x-icon name="fas.shopping-bag" class="text-blue-500 w-10 h-10 shrink-0" />
+                    <div>
+                        <p class="text-sm">Total Pembelian</p>
+                        <p class="text-xl font-bold">Rp. {{ number_format($expenseTotal) }}</p>
+                    </div>
+                </div>
+            </x-card>
 
-        <!-- Stok Charts -->
-        <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
-            <x-slot:title>Stok Pakan Kucing</x-slot:title>
-            <div class="w-full min-w-[320px]">
-                <x-chart wire:model="stokTelurChart" />
-            </div>
-        </x-card>
+            <!-- Aset -->
+            <x-card class="rounded-lg shadow p-4">
+                <div class="flex items-center justify-center gap-3">
+                    <x-icon name="fas.cart-shopping" class="text-green-500 w-10 h-10 shrink-0" />
+                    <div>
+                        <p class="text-sm">Total Transaksi</p>
+                        <p class="text-xl font-bold">{{ number_format($assetTotal) }}</p>
+                    </div>
+                </div>
+            </x-card>
 
-        <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
-            <x-slot:title>Stok Pakan Curah</x-slot:title>
-            <div class="w-full min-w-[320px]">
-                <x-chart wire:model="stokTrayChart" />
-            </div>
-        </x-card>
+            <!-- Liabilitas -->
+            <x-card class="rounded-lg shadow p-4">
+                <div class="flex items-center justify-center gap-3">
+                    <x-icon name="fas.box" class="text-yellow-500 w-10 h-10 shrink-0" />
+                    <div>
+                        <p class="text-sm">Total Barang</p>
+                        <p class="text-xl font-bold">{{ number_format($liabiliatsTotal) }}</p>
+                    </div>
+                </div>
+            </x-card>
+        </div>
 
-        <x-card class="col-span-10 overflow-x-auto">
-            <x-slot:title>Stok Obat Obatan</x-slot:title>
-            <div class="w-full min-w-[320px]">
-                <x-chart wire:model="stokObatChart" />
-            </div>
-        </x-card>
+        <!-- CHARTS -->
+        <div class="grid grid-cols-1 lg:grid-cols-10 gap-4">
+            <x-card class="col-span-10 overflow-x-auto">
+                <x-slot:title>Grafik Penjualan</x-slot:title>
+                <x-slot:menu>
+                    <x-choices-offline label="Pilih Barang Penjualan" wire:model.live="selectedKategoriPendapatan"
+                        :options="collect($kategoriPendapatanList)
+                            ->map(fn($k) => ['id' => $k['id'], 'name' => $k['name']])
+                            ->prepend(['id' => null, 'name' => 'Semua Penjualan'])" option-value="id" option-label="name" single searchable
+                        class="w-full md:w-64" />
+                </x-slot:menu>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="pendapatanChart" />
+                </div>
+            </x-card>
 
-        <x-card class="col-span-10 overflow-x-auto">
-            <x-slot:title>Stok Pakan Sentrat/Pabrikan</x-slot:title>
-            <div class="w-full min-w-[320px]">
-                <x-chart wire:model="stokSentratChart" />
-            </div>
-        </x-card>
-    </div>
+            <x-card class="col-span-10 overflow-x-auto">
+                <x-slot:title>Grafik Pembelian</x-slot:title>
+                <x-slot:menu>
+                    <x-choices-offline label="Pilih Barang Pembelian" wire:model.live="selectedKategoriPengeluaran"
+                        :options="collect($kategoriPengeluaranList)
+                            ->map(fn($k) => ['id' => $k['id'], 'name' => $k['name']])
+                            ->prepend(['id' => null, 'name' => 'Semua Pembelian'])" option-value="id" option-label="name" single searchable
+                        class="w-full md:w-64" />
+                </x-slot:menu>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="pengeluaranChart" />
+                </div>
+            </x-card>
+
+            <!-- Stok Charts -->
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
+                <x-slot:title>Stok Pakan Kucing</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokTelurChart" />
+                </div>
+            </x-card>
+
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
+                <x-slot:title>Stok Pakan Curah</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokTrayChart" />
+                </div>
+            </x-card>
+
+            <x-card class="col-span-10 overflow-x-auto">
+                <x-slot:title>Stok Obat Obatan</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokObatChart" />
+                </div>
+            </x-card>
+
+            <x-card class="col-span-10 overflow-x-auto">
+                <x-slot:title>Stok Pakan Sentrat/Pabrikan</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokSentratChart" />
+                </div>
+            </x-card>
+        </div>
+    @endif
+
 </div>
