@@ -123,7 +123,7 @@ new class extends Component {
     public function clients(): LengthAwarePaginator
     {
         return Client::query()
-            ->with('transaksi.details.kategori') // agar eager load, lebih hemat query
+            ->with('transaksi.details') // agar eager load, lebih hemat query
             ->when($this->search, fn(Builder $q) => $q->where('name', 'like', "%$this->search%"))
             ->when($this->keterangan_id, fn(Builder $q) => $q->where('keterangan', $this->keterangan_id))
             ->orderBy(...array_values($this->sortBy))

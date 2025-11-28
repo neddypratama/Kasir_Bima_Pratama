@@ -100,11 +100,11 @@
                     </x-menu-sub>
                 @endif
 
-                <x-menu-sub title="Pakan & Obat" icon="fas.flask">
+                <x-menu-sub title="Manage Transaksi" icon="fas.basket-shopping">
                     @if (in_array(auth()->user()->role_id, [1, 3]))
                         {{-- <x-menu-item title="Laporan Penjualan" icon="fas.store" link="/laporan-penjualan" /> --}}
-                        <x-menu-item title="Kasir" icon="fas.cart-plus" link="/kasir" />
-                        <x-menu-item title="Pembelian Stok" icon="fas.file-invoice-dollar" link="/supplier" />
+                        <x-menu-item title="Penjualan" icon="fas.cart-plus" link="/kasir" />
+                        <x-menu-item title="Pembelian" icon="fas.sack-dollar" link="/supplier" />
                     @endif
                 </x-menu-sub>
 
@@ -113,8 +113,6 @@
                         <x-menu-item title="Laporan Laba Rugi" icon="fas.money-bill-transfer"
                             link="/laporan-labarugi" />
                         <x-menu-item title="Laporan Aset" icon="fas.chart-simple" link="/laporan-aset" />
-                        <x-menu-item title="Laporan Neraca Saldo" icon="fas.scale-balanced"
-                            link="/laporan-neraca-saldo" />
                     </x-menu-sub>
                 @endif
 

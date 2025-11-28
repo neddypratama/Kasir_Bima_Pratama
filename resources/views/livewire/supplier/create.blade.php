@@ -61,7 +61,7 @@ new class extends Component {
         if ($value) {
             $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
             $str = Str::upper(Str::random(4));
-            $this->invoice = 'PB-' . $tanggal . '-PGN-' . $str; // PB = Pembelian
+            $this->invoice = 'INV-' . $tanggal . '-STK-' . $str; // PB = Pembelian
         }
     }
 
@@ -141,7 +141,7 @@ new class extends Component {
             'user_id' => $this->user_id,
             'tanggal' => $this->tanggal,
             'client_id' => $this->client_id,
-            'type' => 'Debit',
+            'type' => 'Stok',
             'total' => $this->total,
             'uang' => $this->uang,
             'kembalian' => $this->kekurangan,

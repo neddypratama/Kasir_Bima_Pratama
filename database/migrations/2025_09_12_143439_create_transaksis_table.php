@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('invoice')->unique();
             $table->datetime('tanggal');
-            $table->enum('type', ['Kredit', 'Debit']);
+            $table->enum('type', ['Kredit', 'Debit', 'Stok']);
             $table->foreignId('user_id')->constrained('users');
             $table->foreignId('client_id')->nullable()->constrained('clients');
             $table->decimal('total', 15, 2);

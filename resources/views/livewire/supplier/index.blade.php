@@ -132,7 +132,7 @@ new class extends Component {
     {
         return Transaksi::query()
             ->with(['client:id,name,keterangan'])
-            ->where('type', 'Debit')
+            ->where('type', 'Stok')
             ->when($this->search, function (Builder $q) {
                 $q->where(function ($query) {
                     $query->where('invoice', 'like', "%{$this->search}%");
@@ -180,7 +180,7 @@ new class extends Component {
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Transaksi Pembelian Stok" separator progress-indicator>
+    <x-header title="Transaksi Pembelian" separator progress-indicator>
         <x-slot:actions>
             <div class="flex flex-row sm:flex-row gap-2">
                 <x-button wire:click="openExportModal" icon="fas.download" primary>Export Excel</x-button>

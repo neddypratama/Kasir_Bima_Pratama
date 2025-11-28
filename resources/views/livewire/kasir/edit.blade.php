@@ -140,6 +140,7 @@ new class extends Component {
         DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
 
         // SIMPAN DETAIL BARU & UPDATE STOK
+        $totalHPP = 0;
         foreach ($this->details as $item) {
             DetailTransaksi::create([
                 'transaksi_id' => $this->transaksi->id,
@@ -148,8 +149,16 @@ new class extends Component {
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
-
+            $totalHPP += Barang::find($item['barang_id'])->hpp * $item['kuantitas'];
             Barang::find($item['barang_id'])->decrement('stok', $item['kuantitas']);
+        }
+
+        $client = Client::find($this->client_id);
+        $status = '';
+        if ($client->name == 'Quest' && $this->total <= $this->uang) {
+            $status = 'Lunas';
+        } else {
+            $status = 'Hutang';
         }
 
         // Update transaksi
@@ -157,8 +166,37 @@ new class extends Component {
             'client_id' => $this->client_id,
             'tanggal' => $this->tanggal,
             'total' => $this->total,
+            'status' => $status,
             'uang' => $this->uang,
             'kembalian' => max(0, $this->uang - $this->total),
+        ]);
+
+        $inv = substr($this->transaksi->invoice, -4);
+        $part = explode('-', $this->transaksi->invoice);
+        $tanggal = $part[1];
+
+        $hpp = Transaksi::where('invoice', 'like', "%-$tanggal-HPP-$inv")->first();
+
+        DetailTransaksi::where('transaksi_id', $hpp->id)->delete();
+
+        // SIMPAN DETAIL BARU & UPDATE STOK
+        foreach ($this->details as $item) {
+            DetailTransaksi::create([
+                'transaksi_id' => $hpp->id,
+                'barang_id' => $item['barang_id'],
+                'value' => Barang::find($item['barang_id'])->hpp,
+                'kuantitas' => $item['kuantitas'],
+                'sub_total' => Barang::find($item['barang_id'])->hpp * $item['kuantitas'],
+            ]);
+        }
+
+        $hpp->update([
+            'client_id' => $this->client_id,
+            'tanggal' => $this->tanggal,
+            'total' => $totalHPP,
+            'status' => $status,
+            'uang' => null,
+            'kembalian' => null,
         ]);
 
         $this->success('Transaksi berhasil diupdate!', redirectTo: '/kasir');

@@ -15,6 +15,7 @@ new class extends Component {
 
     #[Rule('required|unique:transaksis,invoice')]
     public string $invoice = '';
+    public string $invoice2 = '';
 
     #[Rule('required')]
     public ?int $user_id = null;
@@ -61,6 +62,7 @@ new class extends Component {
             $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
             $str = Str::upper(Str::random(4));
             $this->invoice = 'INV-' . $tanggal . '-DPT-' . $str;
+            $this->invoice = 'INV-' . $tanggal . '-HPP-' . $str;
         }
     }
 
@@ -142,6 +144,7 @@ new class extends Component {
             'kembalian' => max(0, $this->uang - $this->total),
         ]);
 
+        $totalHPP = 0;
         // Simpan detail + kurangi stok
         foreach ($this->details as $item) {
             DetailTransaksi::create([
@@ -151,8 +154,31 @@ new class extends Component {
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
-
+            $totalHPP += Barang::find($item['barang_id'])->hpp * $item['kuantitas'];
             Barang::find($item['barang_id'])->decrement('stok', $item['kuantitas']);
+        }
+
+        $hpp = Transaksi::create([
+            'invoice' => $this->invoice2,
+            'user_id' => $this->user_id,
+            'tanggal' => $this->tanggal,
+            'client_id' => $this->client_id,
+            'type' => 'Debit',
+            'total' => $totalHPP,
+            'status' => $status,
+            'uang' => null,
+            'kembalian' => null,
+        ]);
+
+        // Simpan detail + kurangi stok
+        foreach ($this->details as $item) {
+            DetailTransaksi::create([
+                'transaksi_id' => $hpp->id,
+                'barang_id' => $item['barang_id'],
+                'value' => Barang::find($item['barang_id'])->hpp,
+                'kuantitas' => $item['kuantitas'],
+                'sub_total' => Barang::find($item['barang_id'])->hpp * $item['kuantitas'],
+            ]);
         }
 
         $this->success('Transaksi berhasil dibuat!', redirectTo: '/kasir');
