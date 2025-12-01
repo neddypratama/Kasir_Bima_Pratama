@@ -164,7 +164,7 @@ new class extends Component {
         }
 
         $this->stokData = [];
-        foreach ($mappingstok as $kelompok => $jenisArray) {
+        foreach ($mappingStok as $kelompok => $jenisArray) {
             $detail = [];
             $total = 0;
 
