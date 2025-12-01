@@ -52,19 +52,22 @@ new class extends Component {
         $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : Carbon::parse($lastTransaction->tanggal)->endOfDay();
 
         // 📌 MAPPING BESAR SESUAI PERMINTAAN
-        $mappingstok = [
-            'Stok Pakan' => ['Pakan Sentrat/Pabrikan', 'Pakan Kucing', 'Pakan Curah'],
-            'Stok Obat' => ['Obat-Obatan'],
+        $mappingStok = [
+            'Stok Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix'],
+            'Stok Obat' => ['Obat-Obatan RMN'],
+            'Stok Barang' => ['Barang'],
         ];
-        
+
         $mappingPendapatan = [
-            'Bon Pakan' => ['Pakan Sentrat/Pabrikan', 'Pakan Kucing', 'Pakan Curah'],
-            'Bon Obat' => ['Obat-Obatan'],
+            'Bon Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix'],
+            'Bon Obat' => ['Obat-Obatan RMN'],
+            'Bon Barang' => ['Barang'],
         ];
 
         $mappingPengeluaran = [
-            'Hutang Pakan' => ['Pakan Sentrat/Pabrikan', 'Pakan Kucing', 'Pakan Curah'],
-            'Hutang Obat' => ['Obat-Obatan'],
+            'Hutang Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix'],
+            'Hutang Obat' => ['Obat-Obatan RMN'],
+            'Hutang Barang' => ['Barang'],
         ];
 
         // 🟢 Ambil semua jenis barang (master) agar 0 tetap tampil
@@ -183,7 +186,7 @@ new class extends Component {
 
     public function with(): array
     {
-        $totalAset = array_sum(array_map(fn($d) => $d['total'], $this->pendapatanData ) + array_map(fn($d) => $d['total'], $this->stokData ));
+        $totalAset = array_sum(array_map(fn($d) => $d['total'], $this->pendapatanData) + array_map(fn($d) => $d['total'], $this->stokData));
         $totalLiabilitas = array_sum(array_map(fn($d) => $d['total'], $this->pengeluaranData));
         $totalModal = $totalAset - $totalLiabilitas;
 
