@@ -15,9 +15,6 @@ new class extends Component {
     public Transaksi $transaksi;
 
     #[Rule('required')]
-    public string $invoice = '';
-
-    #[Rule('required')]
     public ?int $user_id = null;
 
     #[Rule('required')]
@@ -136,14 +133,34 @@ new class extends Component {
             Barang::find($old->barang_id)->increment('stok', $old->kuantitas);
         }
 
+        $client = Client::find($this->client_id);
+        $status = '';
+        if ($client->name == 'Quest' && $this->uang > $this->total) {
+            $status = 'Lunas';
+        } else {
+            $status = 'Hutang';
+        }
+
+        $kasir = Transaksi::find($this->transaksi->id)->get();
+        $kasir->update([
+            'user_id' => $this->user_id,
+            'tanggal' => $this->tanggal,
+            'client_id' => $this->client_id,
+            'type' => 'Kredit',
+            'total' => $this->total,
+            'status' => $status,
+            'uang' => $this->uang,
+            'kembalian' => max(0, $this->uang - $this->total),
+        ]);
+
         // Hapus detail lama
-        DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
+        DetailTransaksi::where('transaksi_id', $kasir->id)->delete();
 
         // SIMPAN DETAIL BARU & UPDATE STOK
         $totalHPP = 0;
         foreach ($this->details as $item) {
             DetailTransaksi::create([
-                'transaksi_id' => $this->transaksi->id,
+                'transaksi_id' => $kasir->id,
                 'barang_id' => $item['barang_id'],
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
@@ -151,31 +168,22 @@ new class extends Component {
             ]);
             $totalHPP += Barang::find($item['barang_id'])->hpp * $item['kuantitas'];
             Barang::find($item['barang_id'])->decrement('stok', $item['kuantitas']);
-        }
-
-        $client = Client::find($this->client_id);
-        $status = '';
-        if ($client->name == 'Quest' && $this->total <= $this->uang) {
-            $status = 'Lunas';
-        } else {
-            $status = 'Hutang';
-        }
-
-        // Update transaksi
-        $this->transaksi->update([
-            'client_id' => $this->client_id,
-            'tanggal' => $this->tanggal,
-            'total' => $this->total,
-            'status' => $status,
-            'uang' => $this->uang,
-            'kembalian' => max(0, $this->uang - $this->total),
-        ]);
+        };
 
         $inv = substr($this->transaksi->invoice, -4);
         $part = explode('-', $this->transaksi->invoice);
         $tanggal = $part[1];
 
         $hpp = Transaksi::where('invoice', 'like', "%-$tanggal-HPP-$inv")->first();
+
+        $hpp->update([
+            'user_id' => $this->user_id,
+            'tanggal' => $this->tanggal,
+            'client_id' => $this->client_id,
+            'type' => 'Debit',
+            'total' => $totalHPP,
+            'status' => $status,
+        ]);
 
         DetailTransaksi::where('transaksi_id', $hpp->id)->delete();
 
