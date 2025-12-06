@@ -250,7 +250,7 @@ new class extends Component {
 
                                         {{-- Tampilan ketika sudah dipilih --}}
                                         @scope('selection', $barangs)
-                                            {{ $barangs->name . ' | Rp ' . number_format($barangs->harga, 0, ',', '.') }}
+                                            {{ $barangs->name . ' | Rp ' . number_format($barangs->harga, 0, '.', ',') }}
                                         @endscope
                                     </x-choices-offline>
                                 </div>
@@ -258,7 +258,7 @@ new class extends Component {
                                 <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
                                     wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
-                                    value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, ',', '.') }}"
+                                    value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"
                                     readonly />
 
                             </div>
@@ -275,13 +275,13 @@ new class extends Component {
                     <!-- TOTAL, UANG, KEMBALIAN -->
                     <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
 
-                        <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, ',', '.') }}" readonly
+                        <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
 
                         <x-input label="Uang Diterima" wire:model.live="uang" prefix="Rp " money
                             class="font-bold text-lg" />
 
-                        <x-input label="Kembalian" value="Rp {{ number_format(max(0, $uang - $total), 0, ',', '.') }}"
+                        <x-input label="Kembalian" value="Rp {{ number_format(max(0, $uang - $total), 0, '.', ',') }}"
                             readonly class="font-bold text-lg" />
                     </div>
 
