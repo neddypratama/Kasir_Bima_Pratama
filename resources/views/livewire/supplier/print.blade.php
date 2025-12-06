@@ -2,9 +2,10 @@
 
 use App\Models\Transaksi;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Title;
 use Livewire\Volt\Component;
 
-new #[Layout('components.layouts.empty')] class extends Component {
+new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends Component {
     public Transaksi $transaksi;
 
     public function mount(Transaksi $transaksi)
@@ -12,31 +13,36 @@ new #[Layout('components.layouts.empty')] class extends Component {
         $this->transaksi = $transaksi->load(['client', 'details.barang']);
     }
 };
+
 ?>
 
 <div>
+
     <style>
         html,
         body {
+            height: 100%;
             margin: 0;
             padding: 0;
             font-family: monospace;
         }
 
+        /* HANYA wrapper yang pakai flex */
+        .wrapper {
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 20px;
+        }
+
         .struk {
-            width: 280px;
+            width: 380px;
             padding: 10px;
-            margin: 0 auto;
         }
 
         .center {
             text-align: center;
-        }
-
-        .row {
-            display: flex;
-            justify-content: space-between;
-            font-size: 13px;
         }
 
         hr {
@@ -44,44 +50,142 @@ new #[Layout('components.layouts.empty')] class extends Component {
             border-top: 1px dashed #000;
             margin: 6px 0;
         }
+
+        .table-header {
+            display: flex;
+            font-size: 13px;
+            justify-content: space-between;
+        }
+
+        .item-name {
+            width: 40%;
+        }
+
+        .item-price {
+            width: 20%;
+            text-align: right;
+        }
+
+        .item-qty {
+            width: 15%;
+            text-align: right;
+        }
+
+        .item-sub {
+            width: 25%;
+            text-align: right;
+        }
+
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* === LOGO HEADER === */
+        .header-logo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-logo .title {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .logo {
+            width: 45px;
+            height: auto;
+        }
+
+        @media print {
+            .wrapper {
+                display: block;
+                padding-top: 0;
+            }
+
+            .no-print {
+                display: none;
+            }
+        }
     </style>
 
-    <div class="struk">
-        <div class="center">
-            <h3 style="margin:0;">PEMBELIAN - TOKO PAKAN</h3>
-            <p style="margin:0;">{{ now()->format('d/m/Y H:i') }}</p>
-        </div>
+    <div class="wrapper">
+        <div class="struk">
 
-        <hr>
-
-        <div><strong>Invoice:</strong> {{ $transaksi->invoice }}</div>
-        <div><strong>Supplier:</strong> {{ $transaksi->client->name ?? '-' }}</div>
-
-        <hr>
-
-        @foreach ($transaksi->details as $d)
-            <div class="row">
-                <div style="width:45%">{{ $d->barang->name }}</div>
-                <div style="width:15%; text-align:right">x{{ $d->kuantitas }}</div>
-                <div style="width:30%; text-align:right">Rp {{ number_format($d->sub_total, 0, ',', '.') }}</div>
+            <!-- LOGO + TITLE -->
+            <div class="header-logo">
+                <img src="{{ asset('logo.jpeg') }}" class="logo">
+                <div class="title">
+                    <h3 style="margin:0; font-size:18px;"><strong> BIMA PRATAMA FEED </strong></h3>
+                    <p style="margin:0; font-size:13px;"><strong> Dsn Ngiwak Rt1/9 Kel. Candirejo </strong></p>
+                    <p style="margin:0; font-size:13px;"><strong> Kec. Ponggok Kab. Blitar </strong></p>
+                    <p style="margin:0; font-size:13px;"></strong>WA:</strong>085857609392</p>
+                </div>
+                <img src="{{ asset('logo.jpeg') }}" class="logo">
             </div>
-        @endforeach
 
-        <hr>
+            <hr>
+            <p style="margin:0; font-size:13px;"><strong>Tanggal:</strong> {{ $transaksi->tanggal}}</p>
+            <p style="margin:0; font-size:13px;"><strong>Invoice:</strong> {{ $transaksi->invoice }}</p>
+            <p style="margin:0; font-size:13px;"><strong>Client:</strong> {{ $transaksi->client->name ?? '-' }}</p>
 
-        <div class="row"><strong>Total</strong><strong>Rp {{ number_format($transaksi->total, 0, ',', '.') }}</strong>
-        </div>
-        <div class="row"><span>Bayar</span><span>Rp {{ number_format($transaksi->uang, 0, ',', '.') }}</span></div>
-        <div class="row"><span>Kekurangan</span><span>Rp
-                {{ number_format($transaksi->kekurangan, 0, ',', '.') }}</span>
-        </div>
-        <div class="row"><span>Status</span><span>{{ $transaksi->status }}</span></div>
+            <hr>
 
-        <hr>
-        <div class="center"><small>Terima kasih</small></div>
-        <div class="center no-print" style="margin-top:8px;">
-            <button onclick="window.print()">Print</button>
-            <button onclick="window.history.back()">Kembali</button>
+            <!-- HEADER -->
+            <div class="table-header" style="font-weight: bold;">
+                <div style="width:40%">Barang</div>
+                <div style="width:20%; text-align:right">Harga</div>
+                <div style="width:15%; text-align:right">Qty</div>
+                <div style="width:25%; text-align:right">Sub</div>
+            </div>
+
+            <hr>
+
+            <!-- ITEMS -->
+            @foreach ($transaksi->details as $detail)
+                <div class="table-header">
+                    <div class="item-name">{{ $detail->barang->name }}</div>
+                    <div class="item-price">Rp {{ number_format($detail->value, 0, ',', '.') }}</div>
+                    <div class="item-qty">x{{ $detail->kuantitas }}</div>
+                    <div class="item-sub">Rp {{ number_format($detail->sub_total, 0, ',', '.') }}</div>
+                </div>
+            @endforeach
+
+            <hr>
+
+            <!-- TOTAL -->
+            <div class="total-line">
+                <span>GRAND TOTAL:</span>
+                <span>Rp {{ number_format($transaksi->total, 0, ',', '.') }}</span>
+            </div>
+
+            <div class="total-line">
+                <span>UANG DITERIMA:</span>
+                <span>Rp {{ number_format($transaksi->uang, 0, ',', '.') }}</span>
+            </div>
+
+            <div class="total-line">
+                <span>KEMBALIAN:</span>
+                <span>Rp {{ number_format($transaksi->kembalian, 0, ',', '.') }}</span>
+            </div>
+
+            <hr>
+
+            <div class="center" style="margin-top: 10px;">
+                <p style="font-size:13px;">"Terimakasih telah melakukan transaksi dengan kami, semoga diberi keberkahan"
+                </p>
+                <p style="font-size:13px;">~Bima Pratama Feed ~</p>
+            </div>
+
+            <div class="center no-print" style="margin-top: 10px;">
+                <button onclick="window.print()">Print Struk</button>
+                <button onclick="window.history.back()">Kembali</button>
+            </div>
         </div>
+
     </div>
+
 </div>

@@ -96,6 +96,14 @@ new class extends Component {
     {
         $transaksi = Transaksi::findOrFail($id);
 
+        $inv = substr($transaksi->invoice, -4);
+        $part = explode('-', $transaksi->invoice);
+        $tanggal = $part[1];
+
+        $hpp = Transaksi::where('invoice', 'like', "%-$tanggal-HPP-$inv")->first();
+        $hpp->details()->delete();
+        $hpp->delete();
+
         // 🔄 KEMBALIKAN STOK BARANG
         foreach ($transaksi->details as $detail) {
             $barang = Barang::find($detail->barang_id);
