@@ -20,10 +20,12 @@ new class extends Component {
     public $endDate;
     public array $pendapatanChart = [];
     public array $pengeluaranChart = [];
-    public array $stokTelurChart = [];
-    public array $stokSentratChart = [];
-    public array $stokObatChart = [];
-    public array $stokTrayChart = [];
+    public array $stokHijauanChart = [];
+    public array $stokKonsentratChart = [];
+    public array $stokBBKChart = []; // Bahan Baku Konsentrat
+    public array $stokPremixChart = [];
+    public array $stokObatChart = []; // Obat-Obatan RMN
+    public array $stokBarangChart = [];
 
     public ?int $selectedKategoriPendapatan = null;
     public array $kategoriPendapatanList = [];
@@ -40,10 +42,12 @@ new class extends Component {
         $this->setDefaultDates();
         $this->chartPendapatan();
         $this->chartPengeluaran();
-        $this->chartStokTelur();
-        $this->chartStokSentrat();
-        $this->chartStokTray();
+        $this->chartStokHijauan();
+        $this->chartStokKonsentrat();
+        $this->chartStokBahanBakuKonsentrat();
         $this->chartStokObat();
+        $this->chartStokPremix();
+        $this->chartStokBarang();
     }
 
     protected function setDefaultDates()
@@ -79,10 +83,12 @@ new class extends Component {
         $this->setDefaultDates();
         $this->chartPendapatan();
         $this->chartPengeluaran();
-        $this->chartStokTelur();
-        $this->chartStokSentrat();
-        $this->chartStokTray();
+        $this->chartStokHijauan();
+        $this->chartStokKonsentrat();
+        $this->chartStokBahanBakuKonsentrat();
         $this->chartStokObat();
+        $this->chartStokPremix();
+        $this->chartStokBarang();
     }
 
     public function applyDateRange()
@@ -98,10 +104,12 @@ new class extends Component {
 
         $this->chartPendapatan();
         $this->chartPengeluaran();
-        $this->chartStokTelur();
-        $this->chartStokSentrat();
-        $this->chartStokTray();
+        $this->chartStokHijauan();
+        $this->chartStokKonsentrat();
+        $this->chartStokBahanBakuKonsentrat();
         $this->chartStokObat();
+        $this->chartStokPremix();
+        $this->chartStokBarang();
         $this->toast('Periode tanggal berhasil diperbarui', 'success');
     }
 
@@ -218,37 +226,58 @@ new class extends Component {
         ];
     }
 
-    public function chartStokTelur()
-    {
-        $telurIds = JenisBarang::where('name', 'like', '%Kucing%')->pluck('id');
-        $this->stokTelurChart = $this->generateChartDataPie($telurIds, 'Stok Pakan Kucing');
-    }
-
     /**
-     * Chart stok untuk jenis barang "Sentrat"
+     * Chart stok untuk kategori Hijauan
      */
-    public function chartStokSentrat()
+    public function chartStokHijauan()
     {
-        $sentratIds = JenisBarang::where('name', 'like', '%Sentrat%')->pluck('id');
-        $this->stokSentratChart = $this->generateChartDataBar($sentratIds, 'Stok Sentrat/Pabrikan');
+        $ids = JenisBarang::where('name', 'like', '%Hijauan%')->pluck('id');
+        $this->stokHijauanChart = $this->generateChartDataPie($ids, 'Stok Hijauan');
     }
 
     /**
-     * Chart stok untuk jenis barang "Obat"
+     * Chart stok untuk kategori Konsentrat
+     */
+    public function chartStokKonsentrat()
+    {
+        $ids = JenisBarang::where('name', 'like', 'Konsentrat')->pluck('id');
+        $this->stokKonsentratChart = $this->generateChartDataPie($ids, 'Stok Konsentrat');
+    }
+
+    /**
+     * Chart stok untuk kategori Bahan Baku Konsentrat
+     */
+    public function chartStokBahanBakuKonsentrat()
+    {
+        $ids = JenisBarang::where('name', 'like', 'Bahan Baku Konsentrat')->pluck('id');
+        $this->stokBBKChart = $this->generateChartDataBar($ids, 'Stok Bahan Baku Konsentrat');
+    }
+
+    /**
+     * Chart stok untuk kategori Premix
+     */
+    public function chartStokPremix()
+    {
+        $ids = JenisBarang::where('name', 'like', '%Premix%')->pluck('id');
+        $this->stokPremixChart = $this->generateChartDataBar($ids, 'Stok Premix');
+    }
+
+    /**
+     * Chart stok untuk kategori Obat-Obatan RMN
      */
     public function chartStokObat()
     {
-        $obatIds = JenisBarang::where('name', 'like', '%Obat%')->pluck('id');
-        $this->stokObatChart = $this->generateChartDataBar($obatIds, 'Stok Obat-Obatan');
+        $ids = JenisBarang::where('name', 'like', '%Obat-Obatan RMN%')->pluck('id');
+        $this->stokObatChart = $this->generateChartDataBar($ids, 'Stok Obat-Obatan RMN');
     }
 
     /**
-     * Chart stok untuk jenis barang "Tray"
+     * Chart stok untuk kategori Barang umum
      */
-    public function chartStokTray()
+    public function chartStokBarang()
     {
-        $trayIds = JenisBarang::where('name', 'like', '%Curah%')->pluck('id');
-        $this->stokTrayChart = $this->generateChartDataPie($trayIds, 'Stok Pakan Curah');
+        $ids = JenisBarang::where('name', 'like', '%Barang%')->pluck('id');
+        $this->stokBarangChart = $this->generateChartDataPie($ids, 'Stok Barang');
     }
 
     /**
@@ -384,7 +413,16 @@ new class extends Component {
 
     public function assetTotal(): int
     {
-        return Transaksi::whereBetween('tanggal', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])->count();
+        return Transaksi::where('type', 'not like', 'Stok')
+            ->whereBetween('tanggal', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+            ->count();
+    }
+
+    public function beliTotal(): int
+    {
+        return Transaksi::where('type', 'like', 'Stok')
+            ->whereBetween('tanggal', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
+            ->count();
     }
 
     public function liabiliatsTotal(): int
@@ -431,6 +469,7 @@ new class extends Component {
             'incomeTotal' => $this->incomeTotal(),
             'expenseTotal' => $this->expenseTotal(),
             'assetTotal' => $this->assetTotal(),
+            'beliTotal' => $this->beliTotal(),
             'liabiliatsTotal' => $this->liabiliatsTotal(),
             'hutangPenjualan' => $this->hutangPenjualan(),
             'hutangPembelian' => $this->hutangPembelian(),
@@ -528,8 +567,8 @@ new class extends Component {
             <div class="flex items-center justify-center gap-3">
                 <x-icon name="fas.cart-shopping" class="text-green-500 w-10 h-10 shrink-0" />
                 <div>
-                    <p class="text-sm">Total Transaksi</p>
-                    <p class="text-xl font-bold">{{ number_format($assetTotal) }}</p>
+                    <p class="text-sm">Total Pembelian</p>
+                    <p class="text-xl font-bold">{{ number_format($beliTotal) }}</p>
                 </div>
             </div>
         </x-card>
@@ -576,7 +615,7 @@ new class extends Component {
                 <div class="flex items-center justify-center gap-3">
                     <x-icon name="fas.cart-shopping" class="text-green-500 w-10 h-10 shrink-0" />
                     <div>
-                        <p class="text-sm">Total Transaksi</p>
+                        <p class="text-sm">Total Penjualan</p>
                         <p class="text-xl font-bold">{{ number_format($assetTotal) }}</p>
                     </div>
                 </div>
@@ -624,32 +663,51 @@ new class extends Component {
                 </div>
             </x-card>
 
-            <!-- Stok Charts -->
+            <!-- Stok Hijauan -->
             <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
-                <x-slot:title>Stok Pakan Kucing</x-slot:title>
+                <x-slot:title>Stok Hijauan</x-slot:title>
                 <div class="w-full min-w-[320px]">
-                    <x-chart wire:model="stokTelurChart" />
+                    <x-chart wire:model="stokHijauanChart" />
                 </div>
             </x-card>
 
+            <!-- Stok Konsentrat -->
             <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
-                <x-slot:title>Stok Pakan Curah</x-slot:title>
+                <x-slot:title>Stok Konsentrat</x-slot:title>
                 <div class="w-full min-w-[320px]">
-                    <x-chart wire:model="stokTrayChart" />
+                    <x-chart wire:model="stokKonsentratChart" />
                 </div>
             </x-card>
 
+            <!-- Stok Bahan Baku Konsentrat -->
             <x-card class="col-span-10 overflow-x-auto">
-                <x-slot:title>Stok Obat Obatan</x-slot:title>
+                <x-slot:title>Stok Bahan Baku Konsentrat</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokBBKChart" />
+                </div>
+            </x-card>
+
+            <!-- Stok Premix -->
+            <x-card class="col-span-10 overflow-x-auto">
+                <x-slot:title>Stok Premix</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokPremixChart" />
+                </div>
+            </x-card>
+
+            <!-- Stok Obat-Obatan RMN -->
+            <x-card class="col-span-10 overflow-x-auto">
+                <x-slot:title>Stok Obat-Obatan RMN</x-slot:title>
                 <div class="w-full min-w-[320px]">
                     <x-chart wire:model="stokObatChart" />
                 </div>
             </x-card>
 
+            <!-- Stok Barang Umum -->
             <x-card class="col-span-10 overflow-x-auto">
-                <x-slot:title>Stok Pakan Sentrat/Pabrikan</x-slot:title>
+                <x-slot:title>Stok Barang</x-slot:title>
                 <div class="w-full min-w-[320px]">
-                    <x-chart wire:model="stokSentratChart" />
+                    <x-chart wire:model="stokBarangChart" />
                 </div>
             </x-card>
         </div>

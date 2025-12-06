@@ -83,6 +83,23 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             font-size: 14px;
         }
 
+        /* === LOGO HEADER === */
+        .header-logo {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-logo .title {
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        .logo {
+            width: 45px;
+            height: auto;
+        }
+
         @media print {
             .wrapper {
                 display: block;
@@ -97,14 +114,21 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
 
     <div class="wrapper">
         <div class="struk">
-            <!-- konten struk tetap sama -->
-            <div class="center">
-                <h3 style="margin:0; font-size:18px;">KASIR PAKAN HEWAN</h3>
-                <p style="margin:0; font-size:13px;">{{ now()->format('d/m/Y H:i') }}</p>
+
+            <!-- LOGO + TITLE -->
+            <div class="header-logo">
+                <img src="{{ asset('logo.jpeg') }}" class="logo">
+                <div class="title">
+                    <h3 style="margin:0; font-size:18px;"><strong> BIMA PRATAMA FEED </strong></h3>
+                    <p style="margin:0; font-size:13px;"><strong> Dsn Ngiwak Rt1/9 Kel. Candirejo </strong></p>
+                    <p style="margin:0; font-size:13px;"><strong> Kec. Ponggok Kab. Blitar </strong></p>
+                    <p style="margin:0; font-size:13px;"></strong>WA:</strong>085857609392</p>
+                </div>
+                <img src="{{ asset('logo.jpeg') }}" class="logo">
             </div>
 
             <hr>
-
+            <p style="margin:0; font-size:13px;"><strong>Tanggal:</strong> {{ $transaksi->tanggal}}</p>
             <p style="margin:0; font-size:13px;"><strong>Invoice:</strong> {{ $transaksi->invoice }}</p>
             <p style="margin:0; font-size:13px;"><strong>Client:</strong> {{ $transaksi->client->name ?? '-' }}</p>
 
@@ -151,7 +175,9 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             <hr>
 
             <div class="center" style="margin-top: 10px;">
-                <p style="font-size:13px;">Terima kasih telah berbelanja!</p>
+                <p style="font-size:13px;">"Terimakasih telah melakukan transaksi dengan kami, semoga diberi keberkahan"
+                </p>
+                <p style="font-size:13px;">~Bima Pratama Feed ~</p>
             </div>
 
             <div class="center no-print" style="margin-top: 10px;">
@@ -161,3 +187,5 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
         </div>
 
     </div>
+
+</div>

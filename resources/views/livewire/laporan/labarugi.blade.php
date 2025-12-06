@@ -160,7 +160,7 @@ new class extends Component {
 };
 ?>
 <div class="p-6 space-y-6">
-    <x-header title="Laporan Aset" separator>
+    <x-header title="Laporan Laba Rugi" separator>
         <x-slot:actions>
             <x-button wire:click="export" icon="fas.download" primary>Export Excel</x-button>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
@@ -173,7 +173,7 @@ new class extends Component {
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <x-card>
             <h3 class="text-lg font-semibold text-green-800">
-                <i class="fas fa-coins text-green-600"></i> Total Aset
+                <i class="fas fa-coins text-green-600"></i> Total Pendapatan
             </h3>
             <p class="text-2xl font-bold text-green-700 mt-2">
                 Rp {{ number_format($totalPendapatan, 0, ',', '.') }}
@@ -182,7 +182,7 @@ new class extends Component {
 
         <x-card>
             <h3 class="text-lg font-semibold text-red-800">
-                <i class="fas fa-wallet text-red-600"></i> Total Liabilitas
+                <i class="fas fa-wallet text-red-600"></i> Total Pengeluaran
             </h3>
             <p class="text-2xl font-bold text-red-700 mt-2">
                 Rp {{ number_format($totalPengeluaran, 0, ',', '.') }}
@@ -191,7 +191,7 @@ new class extends Component {
         @if ($totalLaba > 0)
             <x-card>
                 <h3 class="text-lg font-semibold text-green-800">
-                    <i class="fas fa-wallet text-green-600"></i> Total Modal
+                    <i class="fas fa-wallet text-green-600"></i> Total  
                 </h3>
                 <p class="text-2xl font-bold text-green-700 mt-2">
                     Rp {{ number_format($totalLaba, 0, ',', '.') }}
