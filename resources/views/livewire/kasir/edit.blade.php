@@ -206,7 +206,7 @@ new class extends Component {
 
 <div class="p-4 space-y-6">
 
-    <x-header title="Edit Transaksi {{$transaksi->invoice}}" separator progress-indicator />
+    <x-header title="Edit Transaksi {{ $transaksi->invoice }}" separator progress-indicator />
 
     <x-form wire:submit="save">
 
@@ -245,15 +245,25 @@ new class extends Component {
                                 <div class="col-span-2">
                                     <x-choices-offline placeholder="Pilih Barang"
                                         wire:model.live="details.{{ $index }}.barang_id" :options="$barangs" single
-                                        searchable clearable label="Barang" />
+                                        searchable clearable label="Barang">
+                                        {{-- Tampilan item di dropdown --}} @scope('item', $barangs)
+                                            <x-list-item :item="$barangs">
+                                            </x-list-item>
+                                        @endscope
+
+                                        {{-- Tampilan ketika sudah dipilih --}}
+                                        @scope('selection', $barangs)
+                                            {{ $barangs->name . ' | Rp ' . number_format($barangs->harga, 0, ',', '.') }}
+                                        @endscope
+                                    </x-choices-offline>
                                 </div>
 
                                 <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
                                     wire:model.lazy="details.{{ $index }}.kuantitas" />
 
-                                    <x-input label="Total Item"
-                                        value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, ',', '.') }}"
-                                        readonly />
+                                <x-input label="Total Item"
+                                    value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, ',', '.') }}"
+                                    readonly />
 
                             </div>
 
