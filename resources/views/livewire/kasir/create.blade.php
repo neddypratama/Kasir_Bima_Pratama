@@ -62,7 +62,7 @@ new class extends Component {
             $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
             $str = Str::upper(Str::random(4));
             $this->invoice = 'INV-' . $tanggal . '-DPT-' . $str;
-            $this->invoice = 'INV-' . $tanggal . '-HPP-' . $str;
+            $this->invoice2 = 'INV-' . $tanggal . '-HPP-' . $str;
         }
     }
 
