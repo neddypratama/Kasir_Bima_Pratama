@@ -139,7 +139,7 @@ new class extends Component {
 
         $client = Client::find($this->client_id);
         $status = '';
-        if ($client->name == 'Quest' && $this->uang > $this->total) {
+        if ($client->name == 'Quest' && $this->uang >= $this->total) {
             $status = 'Lunas';
         } else {
             $status = 'Hutang';
