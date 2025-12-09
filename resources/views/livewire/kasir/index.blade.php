@@ -55,6 +55,8 @@ new class extends Component {
         $transaksi = Transaksi::findOrFail($this->selectedId);
         $transaksi->update([
             'status' => $this->newStatus,
+            'kembalian' => 0,
+            'uang' => $transaksi->total,
             'updated_at' => now(),
         ]);
 
