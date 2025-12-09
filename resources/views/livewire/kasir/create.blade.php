@@ -24,10 +24,10 @@ new class extends Component {
     #[Rule('required')]
     public ?int $client_id = null;
 
-    #[Rule('required|number|min:1')]
+    #[Rule('required|numeric|min:1')]
     public float $total = 0;
 
-    #[Rule('nullable|number|min:1')]
+    #[Rule('nullable|numeric|min:1')]
     public ?float $uang = 0; // uang diterima dari pelanggan
 
     #[Rule('required')]
