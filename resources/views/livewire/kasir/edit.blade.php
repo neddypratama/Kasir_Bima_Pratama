@@ -141,7 +141,7 @@ new class extends Component {
             $status = 'Hutang';
         }
 
-        $kasir = Transaksi::find($this->transaksi->id)->get();
+        $kasir = Transaksi::find($this->transaksi->id);
         $kasir->update([
             'user_id' => $this->user_id,
             'tanggal' => $this->tanggal,
