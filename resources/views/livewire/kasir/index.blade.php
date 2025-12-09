@@ -53,12 +53,19 @@ new class extends Component {
     public function updateStatus(): void
     {
         $transaksi = Transaksi::findOrFail($this->selectedId);
-        $transaksi->update([
-            'status' => $this->newStatus,
-            'kembalian' => 0,
-            'uang' => $transaksi->total,
-            'updated_at' => now(),
-        ]);
+        if ($this->newStatus == 'Lunas') {
+            $transaksi->update([
+                'status' => $this->newStatus,
+                'kembalian' => 0,
+                'uang' => $transaksi->total,
+                'updated_at' => now(),
+            ]);
+        } else {
+            $transaksi->update([
+                'status' => $this->newStatus,
+                'updated_at' => now(),
+            ]);
+        }
 
         $this->statusModal = false;
         $this->success("Status transaksi {$transaksi->invoice} berhasil diubah menjadi {$this->newStatus}", position: 'toast-top');
