@@ -7,12 +7,16 @@ use App\Models\Barang;
 use App\Models\Client;
 use Mary\Traits\Toast;
 use Livewire\WithFileUploads;
+use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
 
 new class extends Component {
     use Toast, WithFileUploads;
 
     public Transaksi $transaksi;
+
+    #[Rule('required')]
+    public ?string $invoice = null;
 
     #[Rule('required')]
     public ?int $user_id = null;
