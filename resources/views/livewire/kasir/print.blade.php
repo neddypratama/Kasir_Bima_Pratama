@@ -21,23 +21,49 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
     <style>
         html,
         body {
-            height: 100%;
             margin: 0;
             padding: 0;
             font-family: monospace;
         }
 
-        /* HANYA wrapper yang pakai flex */
+        /* === UKURAN KERTAS === */
+        @page {
+            size: 58mm 210mm;
+            /* width 58mm, height 210mm */
+            margin: 0;
+            /* no margin */
+        }
+
+        @media print {
+            body {
+                width: 58mm;
+            }
+
+            .wrapper {
+                display: block;
+                padding: 0;
+                margin: 0;
+            }
+
+            .struk {
+                width: 58mm;
+                padding: 2mm;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
+
+        /* === STYLING STRUK UMUM === */
         .wrapper {
-            height: 100%;
             display: flex;
             justify-content: center;
-            align-items: flex-start;
-            padding-top: 20px;
+            padding-top: 10px;
         }
 
         .struk {
-            width: 380px;
+            width: 58mm;
             padding: 10px;
         }
 
@@ -83,32 +109,16 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             font-size: 14px;
         }
 
-        /* === LOGO HEADER === */
         .header-logo {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .header-logo .title {
-            text-align: center;
-            flex-grow: 1;
-        }
-
         .logo {
-            width: 45px;
+            width: 30px;
+            /* kecil agar muat di kertas 58mm */
             height: auto;
-        }
-
-        @media print {
-            .wrapper {
-                display: block;
-                padding-top: 0;
-            }
-
-            .no-print {
-                display: none;
-            }
         }
     </style>
 
@@ -128,7 +138,7 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             </div>
 
             <hr>
-            <p style="margin:0; font-size:13px;"><strong>Tanggal:</strong> {{ $transaksi->tanggal}}</p>
+            <p style="margin:0; font-size:13px;"><strong>Tanggal:</strong> {{ $transaksi->tanggal }}</p>
             <p style="margin:0; font-size:13px;"><strong>Invoice:</strong> {{ $transaksi->invoice }}</p>
             <p style="margin:0; font-size:13px;"><strong>Client:</strong> {{ $transaksi->client->name ?? '-' }}</p>
 
