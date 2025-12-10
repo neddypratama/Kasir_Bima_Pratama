@@ -24,14 +24,14 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             margin: 0;
             padding: 0;
             font-family: monospace;
+            font-size: 11px;
+            /* ukuran default */
         }
 
         /* === UKURAN KERTAS === */
         @page {
             size: 58mm 210mm;
-            /* width 58mm, height 210mm */
             margin: 0;
-            /* no margin */
         }
 
         @media print {
@@ -42,7 +42,6 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             .wrapper {
                 display: block;
                 padding: 0;
-                margin: 0;
             }
 
             .struk {
@@ -55,7 +54,7 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             }
         }
 
-        /* === STYLING STRUK UMUM === */
+        /* === STRUK STYLE === */
         .wrapper {
             display: flex;
             justify-content: center;
@@ -64,23 +63,35 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
 
         .struk {
             width: 58mm;
-            padding: 10px;
+            padding: 8px;
         }
 
         .center {
             text-align: center;
         }
 
+        /* Divider */
         hr {
             border: 0;
             border-top: 1px dashed #000;
-            margin: 6px 0;
+            margin: 5px 0;
         }
 
-        .table-header {
-            display: flex;
-            font-size: 13px;
-            justify-content: space-between;
+        /* Header Font */
+        .header-logo h3 {
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .header-logo p {
+            font-size: 10px;
+            margin: 0;
+        }
+
+        /* Font tabel item */
+        .table-header,
+        .table-header div {
+            font-size: 11px;
         }
 
         .item-name {
@@ -102,13 +113,16 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             text-align: right;
         }
 
+        /* Total */
         .total-line {
             display: flex;
             justify-content: space-between;
+            font-size: 12px;
             font-weight: bold;
-            font-size: 14px;
+            margin-top: 3px;
         }
 
+        /* Logo */
         .header-logo {
             display: flex;
             justify-content: space-between;
@@ -116,9 +130,16 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
         }
 
         .logo {
-            width: 30px;
-            /* kecil agar muat di kertas 58mm */
+            width: 28px;
+            /* pas untuk 58mm */
             height: auto;
+        }
+
+        /* Footer Text */
+        .footer-text {
+            text-align: center;
+            font-size: 10px;
+            margin-top: 8px;
         }
     </style>
 
