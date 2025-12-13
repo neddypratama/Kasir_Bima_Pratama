@@ -92,13 +92,13 @@ new class extends Component {
         // ------------------ MAPPING YANG KAMU MAU ------------------ //
 
         $mappingPendapatan = [
-            'Penjualan Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix'],
+            'Penjualan Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
             'Penjualan Obat' => ['Obat-Obatan RMN'],
             'Penjualan Barang' => ['Barang'],
         ];
 
         $mappingPengeluaran = [
-            'HPP Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix'],
+            'HPP Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
             'HPP Obat' => ['Obat-Obatan RMN'],
             'HPP Barang' => ['Barang'],
         ];
