@@ -1,18 +1,17 @@
 <?php
 
 use Livewire\Volt\Component;
+use App\Models\KonversiSatuan;
 use App\Models\Transaksi;
 use App\Models\DetailTransaksi;
 use App\Models\Barang;
 use App\Models\Client;
-use App\Models\User;
 use Mary\Traits\Toast;
-use Livewire\WithFileUploads;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
 
 new class extends Component {
-    use Toast, WithFileUploads;
+    use Toast;
 
     #[Rule('required|unique:transaksis,invoice')]
     public string $invoice = '';
@@ -24,11 +23,9 @@ new class extends Component {
     #[Rule('required')]
     public ?int $client_id = null;
 
-    #[Rule('required|numeric|min:1')]
     public float $total = 0;
 
-    #[Rule('nullable|numeric|min:1')]
-    public ?float $uang = 0; // uang diterima dari pelanggan
+    public ?float $uang = 0;
 
     #[Rule('required')]
     public ?string $tanggal = null;
@@ -37,6 +34,9 @@ new class extends Component {
 
     public $barangs;
 
+    /* =====================
+        WITH
+    ====================== */
     public function with(): array
     {
         return [
@@ -45,6 +45,9 @@ new class extends Component {
         ];
     }
 
+    /* =====================
+        MOUNT
+    ====================== */
     public function mount(): void
     {
         $this->user_id = auth()->id();
@@ -52,87 +55,104 @@ new class extends Component {
         $this->updatedTanggal($this->tanggal);
 
         $this->barangs = Barang::all();
+
         $quest = Client::where('name', 'like', '%Quest%')->first();
-        $this->client_id = $quest ? $quest->id : null;
+        $this->client_id = $quest?->id;
+
         $this->addDetail();
     }
 
     public function updatedTanggal($value): void
     {
-        if ($value) {
-            $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
-            $str = Str::upper(Str::random(4));
-            $this->invoice = 'INV-' . $tanggal . '-DPT-' . $str;
-            $this->invoice2 = 'INV-' . $tanggal . '-HPP-' . $str;
-        }
+        $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
+        $rand = Str::upper(Str::random(4));
+
+        $this->invoice = "INV-$tanggal-DPT-$rand";
+        $this->invoice2 = "INV-$tanggal-HPP-$rand";
     }
 
+    /* =====================
+        DETAIL HANDLING
+    ====================== */
     public function updatedDetails($value, $key): void
     {
-        // Ketika memilih barang
+        $index = explode('.', $key)[0];
+
+        /*
+    |--------------------------------------------------------------------------
+    | PILIH BARANG
+    |--------------------------------------------------------------------------
+    */
         if (str_ends_with($key, '.barang_id')) {
-            $index = explode('.', $key)[0];
             $barang = Barang::find($value);
 
             if ($barang) {
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
-                $this->details[$index]['value'] = $barang->harga; // auto harga
+
+                $this->details[$index]['satuans'] = KonversiSatuan::where('barang_id', $barang->id)->get();
+
+                $this->details[$index]['satuan'] = null;
+                $this->details[$index]['value'] = 0;
             }
         }
 
-        // Update qty
+        /*
+    |--------------------------------------------------------------------------
+    | PILIH SATUAN
+    |--------------------------------------------------------------------------
+    */
+        if (str_ends_with($key, '.satuan')) {
+            $satuan = KonversiSatuan::find($value);
+
+            if ($satuan) {
+                $barang = Barang::find($this->details[$index]['barang_id']);
+
+                if ($barang) {
+                    // stok dasar / konversi satuan
+                    $this->details[$index]['max_qty'] = floor($barang->stok / $satuan->konversi);
+
+                    $this->details[$index]['value'] = $satuan->harga;
+                }
+            }
+        }
+
+        /*
+    |--------------------------------------------------------------------------
+    | QTY
+    |--------------------------------------------------------------------------
+    */
         if (str_ends_with($key, '.kuantitas')) {
-            $index = explode('.', $key)[0];
-            $qty = max(1, $value);
-            $maxQty = $this->details[$index]['max_qty'] ?? null;
+            $qty = max(1, (int) $value);
+            $max = $this->details[$index]['max_qty'] ?? $qty;
 
-            if ($maxQty !== null && $qty > $maxQty) {
-                $qty = $maxQty;
-            }
-
-            $this->details[$index]['kuantitas'] = $qty;
+            $this->details[$index]['kuantitas'] = min($qty, $max);
         }
 
-        // Hitung total
         $this->calculateTotal();
     }
 
     private function calculateTotal(): void
     {
-        $this->total = collect($this->details)->sum(function ($item) {
-            return ($item['value'] ?? 0) * ($item['kuantitas'] ?? 1);
-        });
+        $this->total = collect($this->details)->sum(fn($i) => ($i['value'] ?? 0) * ($i['kuantitas'] ?? 1));
     }
 
+    /* =====================
+        SAVE
+    ====================== */
     public function save(): void
     {
         $this->validate([
             'client_id' => 'required',
             'details' => 'required|array|min:1',
             'details.*.barang_id' => 'required|exists:barangs,id',
-            'details.*.value' => 'required|numeric|min:0',
+            'details.*.satuan' => 'required|exists:konversi_satuans,id',
             'details.*.kuantitas' => 'required|numeric|min:1',
         ]);
 
-        // Validasi stok
-        foreach ($this->details as $i => $item) {
-            $barang = Barang::find($item['barang_id']);
-
-            if ($item['kuantitas'] > $barang->stok) {
-                $this->addError("details.$i.kuantitas", 'Qty melebihi stok barang.');
-                return;
-            }
-        }
-
         $client = Client::find($this->client_id);
-        $status = '';
-        if ($client->name == 'Quest' && $this->uang >= $this->total) {
-            $status = 'Lunas';
-        } else {
-            $status = 'Hutang';
-        }
-        // Simpan transaksi
+        $status = $client->name == 'Quest' && $this->uang >= $this->total ? 'Lunas' : 'Hutang';
+
         $kasir = Transaksi::create([
             'invoice' => $this->invoice,
             'user_id' => $this->user_id,
@@ -146,17 +166,21 @@ new class extends Component {
         ]);
 
         $totalHPP = 0;
-        // Simpan detail + kurangi stok
+
         foreach ($this->details as $item) {
+            $barang = Barang::find($item['barang_id']);
+
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
-                'barang_id' => $item['barang_id'],
+                'barang_id' => $barang->id,
+                'satuan_id' => $item['satuan'],
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
-            $totalHPP += Barang::find($item['barang_id'])->hpp * $item['kuantitas'];
-            Barang::find($item['barang_id'])->decrement('stok', $item['kuantitas']);
+
+            $totalHPP += $barang->hpp * $item['kuantitas'];
+            $barang->decrement('stok', $item['kuantitas'] * KonversiSatuan::find($item['satuan'])->konversi);
         }
 
         $hpp = Transaksi::create([
@@ -167,18 +191,18 @@ new class extends Component {
             'type' => 'Debit',
             'total' => $totalHPP,
             'status' => $status,
-            'uang' => null,
-            'kembalian' => null,
         ]);
 
-        // Simpan detail + kurangi stok
         foreach ($this->details as $item) {
+            $barang = Barang::find($item['barang_id']);
+
             DetailTransaksi::create([
                 'transaksi_id' => $hpp->id,
-                'barang_id' => $item['barang_id'],
-                'value' => Barang::find($item['barang_id'])->hpp,
+                'barang_id' => $barang->id,
+                'satuan_id' => $item['satuan'],
+                'value' => $barang->hpp,
                 'kuantitas' => $item['kuantitas'],
-                'sub_total' => Barang::find($item['barang_id'])->hpp * $item['kuantitas'],
+                'sub_total' => $barang->hpp * $item['kuantitas'],
             ]);
         }
 
@@ -189,9 +213,11 @@ new class extends Component {
     {
         $this->details[] = [
             'barang_id' => null,
+            'satuan' => null,
             'value' => 0,
             'kuantitas' => 1,
             'max_qty' => null,
+            'satuans' => [],
         ];
     }
 
@@ -239,7 +265,7 @@ new class extends Component {
 
                     @foreach ($details as $index => $item)
                         <div class="rounded-xl space-y-3">
-                            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <div class="col-span-2">
                                     <x-choices-offline placeholder="Pilih Barang"
                                         wire:model.live="details.{{ $index }}.barang_id" :options="$barangs" single
@@ -251,11 +277,16 @@ new class extends Component {
 
                                         {{-- Tampilan ketika sudah dipilih --}}
                                         @scope('selection', $barangs)
-                                            {{ $barangs->name . ' | Rp ' . number_format($barangs->harga, 0, '.', ',') }}
+                                            {{ $barangs->name }}
                                         @endscope
                                     </x-choices-offline>
                                 </div>
+                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
+                                    :options="$item['satuans']" option-value="id" option-label="name"
+                                    placeholder="Pilih Satuan" />
 
+                                <x-input label="Harga Jual"
+                                    value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
                                 <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
                                     wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"

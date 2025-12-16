@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('barangs', function (Blueprint $table) {
+        Schema::create('konversi_satuans', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('jenis_id')->constrained('jenis_barangs');
+            $table->foreignId('barang_id')->constrained('barangs');
             $table->string('name');
-            $table->string('satuan');
-            $table->decimal('stok');
-            $table->decimal('hpp')->nullable();
+            $table->decimal('konversi');
+            $table->decimal('harga');
             $table->timestamps();
         });
     }
@@ -27,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('barangs');
+        Schema::dropIfExists('konversi_satuans');
     }
 };

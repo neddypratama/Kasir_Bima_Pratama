@@ -12,12 +12,22 @@ class Barang extends Model
         'name',
         'jenis_id',
         'stok',
+        'satuan',
         'hpp',
-        'harga'
     ];
 
     public function jenis()
     {
-        return $this->belongsTo(JenisBarang::class, 'jenis_id');
+        return $this->belongsTo(JenisBarang::class);
+    }
+
+    public function satuans()
+    {
+        return $this->hasMany(KonversiSatuan::class);
+    }
+
+    public function details()
+    {
+        return $this->hasMany(DetailTransaksi::class);
     }
 }

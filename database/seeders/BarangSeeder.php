@@ -58,11 +58,11 @@ class BarangSeeder extends Seeder
                 DB::table('barangs')->insert([
                     'jenis_id' => $jenisBarangIds[$jenis],
                     'name' => $barang,
-                'stok' => 0,
-                'harga' => null,
-                'hpp' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
+                    'stok' => 0,
+                    'satuan' => 'Kg',
+                    'hpp' => null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
             }
         }

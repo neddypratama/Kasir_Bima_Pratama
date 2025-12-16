@@ -10,43 +10,38 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
 
     public function mount(Transaksi $transaksi)
     {
-        $this->transaksi = $transaksi->load(['client', 'details.barang']);
+        $this->transaksi = $transaksi->load(['client', 'details.barang', 'details.satuan']);
     }
 };
-
 ?>
 
 <div>
-
     <style>
+        /* RESET */
+        * {
+            box-sizing: border-box;
+        }
+
         html,
         body {
             margin: 0;
             padding: 0;
             font-family: monospace;
-            font-size: 11px;
+            font-size: 10.5px;
+            background: #fff;
+            color: #000;
         }
 
-        /* === UKURAN KERTAS 58 x 210 MM === */
+        /* KERTAS THERMAL 58mm */
         @page {
-            size: 58mm 210mm;
+            size: 58mm auto;
             margin: 0;
         }
 
         @media print {
             body {
-                width: 58mm;
-            }
-
-            .wrapper {
-                display: block;
-                padding: 0;
                 margin: 0;
-            }
-
-            .struk {
-                width: 58mm;
-                padding: 2mm 2mm;
+                padding: 0;
             }
 
             .no-print {
@@ -54,226 +49,142 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
             }
         }
 
-        /* WRAPPER */
-        .wrapper {
-            display: flex;
-            justify-content: center;
-            padding-top: 6px;
-        }
-
-        .struk {
+        /* AREA CETAK AMAN (ANTI KEPOTONG) */
+        .paper {
             width: 58mm;
-            padding: 6px 6px;
-            box-sizing: border-box;
+
+            /* PENTING: KANAN LEBIH BESAR */
+            padding: 6px 50px 6px 2px;
+
+            margin: 0 auto;
         }
 
+        /* ALIGN */
         .center {
             text-align: center;
         }
 
-        hr {
-            border: 0;
+        .left {
+            text-align: left;
+        }
+
+        /* GARIS */
+        .line {
             border-top: 1px dashed #000;
             margin: 6px 0;
         }
 
-        /* HEADER */
-        .header-logo {
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        /* ITEM */
+        .item {
+            margin-bottom: 5px;
         }
 
-        .header-title {
-            flex: 1 1 auto;
-            text-align: center;
-        }
-
-        .header-title h3 {
-            font-size: 14px;
-            margin: 0;
-            line-height: 1;
-        }
-
-        .header-title p {
-            font-size: 10px;
-            margin: 0;
-            line-height: 1;
-        }
-
-        .logo {
-            width: 28px;
-            height: auto;
-        }
-
-        /* TABEL (HEADER + ROWS) */
-        /* Gunakan kelas 'table' sebagai kontainer; header dan rows berbagi aturan kolom */
-        table {
-            width: 100%;
-            display: block;
-            box-sizing: border-box;
-        }
-
-        .table-row {
-            display: flex;
-            width: 100%;
-            align-items: flex-start;
-            box-sizing: border-box;
-        }
-
-        /* Kolom presisi agar tidak overflow */
-        .col-name {
-            width: 35%;
-            font-size: 9px;
-            word-wrap: break-word;
+        .item-name {
             white-space: normal;
-        }
-
-        .col-price {
-            width: 18%;
-            font-size: 9px;
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        .col-qty {
-            width: 15%;
-            font-size: 9px;
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        .col-sub {
-            width: 27%;
-            font-size: 9px;
-            text-align: right;
-            white-space: nowrap;
-        }
-
-        .table-header {
-            font-weight: bold;
-            font-size: 9px;
-        }
-
-        .table-item {
-            margin: 2px 0;
-        }
-
-        /* Jika nama barang sangat panjang, ini memastikan text-wrap */
-        .col-name span {
-            display: inline-block;
             word-break: break-word;
-            white-space: normal;
+        }
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .item-row span {
+            white-space: nowrap;
+        }
+
+        .item-row span:last-child {
+            min-width: 40px;
+            text-align: right;
         }
 
         /* TOTAL */
-        .total-line {
+        .total-row {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
             font-weight: bold;
-            margin-top: 6px;
         }
 
-        .footer-text {
+        /* FOOTER */
+        .footer {
             text-align: center;
             font-size: 10px;
-            margin-top: 8px;
+            line-height: 1.4;
         }
 
-        /* Tombol (non-print) */
-        .no-print button {
-            margin: 4px;
-            padding: 6px 8px;
-            font-size: 12px;
+        .footer p {
+            margin: 0;
         }
     </style>
 
-    <div class="wrapper">
-        <div class="struk">
+    <div class="paper">
 
-            <!-- HEADER -->
-            <div class="header-logo">
-                <img src="{{ asset('logo.jpeg') }}" class="logo" alt="logo">
-                <div class="header-title">
-                    <h3><strong>BIMA PRATAMA FEED</strong></h3>
-                    <p><strong>Dsn Ngiwak Rt1/9 Kel. Candirejo</strong></p>
-                    <p><strong>Kec. Ponggok Kab. Blitar</strong></p>
-                    <p><strong>WA: 085857609392</strong></p>
-                </div>
-                <img src="{{ asset('logo.jpeg') }}" class="logo" alt="logo">
-            </div>
-
-            <hr>
-
-            <!-- INFO TRANSAKSI -->
-            <p style="margin:0; font-size:11px;"><strong>Tanggal:</strong> {{ $transaksi->tanggal }}</p>
-            <p style="margin:0; font-size:11px;"><strong>Invoice:</strong> {{ $transaksi->invoice }}</p>
-            <p style="margin:0; font-size:11px;"><strong>Client:</strong> {{ $transaksi->client->name ?? '-' }}</p>
-
-            <hr>
-
-            <!-- HEADER TABEL -->
-            <div class="table table-header table-row" role="heading">
-                <div class="col-name">Barang</div>
-                <div class="col-price">Harga</div>
-                <div class="col-qty">Qty</div>
-                <div class="col-sub">Sub</div>
-            </div>
-
-            <hr>
-
-            <!-- DETAIL ITEMS -->
-            <div class="table">
-                @foreach ($transaksi->details as $detail)
-                    <div class="table-row table-item" aria-label="item">
-                        <!-- Nama barang: boleh wrap -->
-                        <div class="col-name"><span>{{ $detail->barang->name }}</span></div>
-
-                        <!-- Harga: jangan wrap -->
-                        <div class="col-price">Rp{{ number_format($detail->value, 0, ',', '.') }}</div>
-
-                        <!-- Qty -->
-                        <div class="col-qty">x{{ (int) $detail->kuantitas }}</div>
-
-                        <!-- Sub total -->
-                        <div class="col-sub">Rp{{ number_format($detail->sub_total, 0, ',', '.') }}</div>
-                    </div>
-                @endforeach
-            </div>
-
-            <hr>
-
-            <!-- TOTAL -->
-            <div class="total-line">
-                <span>GRAND TOTAL:</span>
-                <span>Rp{{ number_format($transaksi->total, 0, ',', '.') }}</span>
-            </div>
-
-            <div class="total-line">
-                <span>UANG DITERIMA:</span>
-                <span>Rp{{ number_format($transaksi->uang, 0, ',', '.') }}</span>
-            </div>
-
-            <div class="total-line">
-                <span>KEMBALIAN:</span>
-                <span>Rp{{ number_format($transaksi->kembalian, 0, ',', '.') }}</span>
-            </div>
-
-            <hr>
-
-            <!-- FOOTER -->
-            <div class="footer-text">
-                <p>"Terimakasih telah melakukan transaksi dengan kami, semoga diberi keberkahan"</p>
-                <p>~ Bima Pratama Feed ~</p>
-            </div>
-
-            <div class="center no-print" style="margin-top: 10px;">
-                <button onclick="window.print()">Print Struk</button>
-                <button onclick="window.history.back()">Kembali</button>
-            </div>
-
+        <!-- HEADER -->
+        <div class="center">
+            <img src="{{ asset('logo.jpeg') }}" width="32" alt="logo">
+            <div><strong>BIMA PRATAMA FEED</strong></div>
+            <div>Dsn Ngiwak Rt1/9 Kel. Candirejo</div>
+            <div>Kec. Ponggok Kab. Blitar</div>
+            <div>WA: 085857609392</div>
         </div>
-    </div>
 
+        <div class="line"></div>
+
+        <!-- INFO -->
+        <div class="left">
+            <div>Tanggal : {{ $transaksi->tanggal }}</div>
+            <div>Invoice : {{ $transaksi->invoice }}</div>
+            <div>Client : {{ $transaksi->client->name ?? 'Guest' }}</div>
+        </div>
+
+        <div class="line"></div>
+
+        <!-- ITEMS -->
+        @foreach ($transaksi->details as $detail)
+            <div class="item">
+                <div class="item-name">
+                    {{ strtoupper($detail->barang->name) }} ({{ $detail->satuan->name }})
+                </div>
+                <div class="item-row">
+                    <span>
+                        {{ $detail->kuantitas }} x {{ number_format($detail->value, 0, ',', '.') }}
+                    </span>
+                    <span>
+                        {{ number_format($detail->sub_total, 0, ',', '.') }}
+                    </span>
+                </div>
+            </div>
+        @endforeach
+
+        <div class="line"></div>
+
+        <!-- TOTAL -->
+        <div class="total-row">
+            <span>TOTAL</span>
+            <span>{{ number_format($transaksi->total, 0, ',', '.') }}</span>
+        </div>
+        <div class="item-row">
+            <span>BAYAR</span>
+            <span>{{ number_format($transaksi->uang, 0, ',', '.') }}</span>
+        </div>
+        <div class="item-row">
+            <span>KEMBALI</span>
+            <span>{{ number_format($transaksi->kembalian, 0, ',', '.') }}</span>
+        </div>
+
+        <div class="line"></div>
+
+        <!-- FOOTER -->
+        <div class="footer">
+            <p>"Terimakasih telah melakukan, transaksi dengan kami, Semoga diberi keberkahan"</p>
+        </div>
+        <p class="text-center mt-3">~ Bima Pratama Feed ~</p>    
+
+        <!-- BUTTON -->
+        <div class="center no-print" style="margin-top:8px;">
+            <button onclick="window.print()">Print</button>
+            <button onclick="history.back()">Kembali</button>
+        </div>
+
+    </div>
 </div>

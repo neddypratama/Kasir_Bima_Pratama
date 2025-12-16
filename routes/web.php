@@ -58,6 +58,7 @@ Route::middleware('auth')->group(function () {
         Volt::route('/barangs', 'barangs.index');
         Volt::route('/barangs/create', 'barangs.create');
         Volt::route('/barangs/{barang}/edit', 'barangs.edit');
+        Volt::route('/barangs/{barang}/detail', 'barangs.detail');
 
         Volt::route('/jenisbarangs', 'jenisbarangs.index');
         Volt::route('/clients', 'clients.index');

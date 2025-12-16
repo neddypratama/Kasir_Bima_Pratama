@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\KonversiSatuan;
 use App\Models\Barang;
 use App\Models\JenisBarang;
 use Livewire\Volt\Component;
@@ -48,6 +49,10 @@ new class extends Component {
     public function delete($id): void
     {
         $barang = Barang::findOrFail($id);
+        $satuan = KonversiSatuan::where('barang_id', $id)->get();
+        foreach ($satuan as $key) {
+            $key->delete();
+        }
         $barang->delete();
         $this->warning("Barang $barang->name akan dihapus", position: 'toast-top');
     }
@@ -55,26 +60,28 @@ new class extends Component {
     // Table headers
     public function headers(): array
     {
-        return [['key' => 'id', 'label' => '#', 'class' => 'w-1'], ['key' => 'jenis_name', 'label' => 'Jenis Barang'], ['key' => 'name', 'label' => 'Name'], ['key' => 'stok', 'label' => 'Stok'], ['key' => 'hpp', 'label' => 'Harga Pokok', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'harga', 'label' => 'Harga Jual', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'created_at', 'label' => 'Tanggal Dibuat', 'class' => 'w-1']];
+        return [['key' => 'id', 'label' => '#', 'class' => 'w-1'], ['key' => 'jenis_name', 'label' => 'Jenis Barang'], ['key' => 'name', 'label' => 'Name'], ['key' => 'stok', 'label' => 'Stok'], ['key' => 'hpp', 'label' => 'Harga Pokok', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'satuans_count', 'label' => 'Jumlah Satuan', 'class' => 'w-24']];
     }
 
     public function barangs(): LengthAwarePaginator
     {
-        return Barang::query()->withAggregate('jenis', 'name')->when($this->search, fn(Builder $q) => $q->where('name', 'like', "%$this->search%"))->when($this->jenis_id, fn(Builder $q) => $q->where('jenis_id', $this->jenis_id))->orderBy(...array_values($this->sortBy))->paginate($this->perPage);
+        return Barang::query()->withAggregate('jenis', 'name')->withCount('satuans')->when($this->search, fn(Builder $q) => $q->where('name', 'like', "%$this->search%"))->when($this->jenis_id, fn(Builder $q) => $q->where('jenis_id', $this->jenis_id))->orderBy(...array_values($this->sortBy))->paginate($this->perPage);
     }
 
     public function with(): array
     {
-        if ($this->filter >= 0 && $this->filter < 2) {
-            if (!$this->search == null) {
-                $this->filter = 1;
-            } else {
-                $this->filter = 0;
-            }
-            if (!$this->jenis_id == 0) {
-                $this->filter += 1;
-            }
+        $filter = 0;
+
+        if ($this->search !== '') {
+            $filter++;
         }
+
+        if ($this->jenis_id !== 0) {
+            $filter++;
+        }
+
+        $this->filter = $filter;
+
         return [
             'barangs' => $this->barangs(),
             'headers' => $this->headers(),
@@ -87,7 +94,7 @@ new class extends Component {
     // Reset pagination when any component property changes
     public function updated($property): void
     {
-        if (!is_array($property) && $property != '') {
+        if (in_array($property, ['search', 'jenis_id', 'perPage'])) {
             $this->resetPage();
         }
     }
@@ -125,11 +132,20 @@ new class extends Component {
     <!-- TABLE wire:poll.5s="Barangs"  -->
     <x-card>
         <x-table :headers="$headers" :rows="$barangs" :sort-by="$sortBy" with-pagination
-            link="barangs/{id}/edit?name={name}&jenis={jenis.name}">
+            link="barangs/{id}/detail?name={name}&jenis={jenis.name}">
+            @scope('cell_stok', $barang)
+                {{ $barang->stok }} {{ $barang->satuan }}
+            @endscope
+
             @scope('actions', $barang)
-                <x-button icon="o-trash" wire:click="delete({{ $barang['id'] }})"
-                    wire:confirm="Yakin ingin menghapus {{ $barang['name'] }}?" spinner
-                    class="btn-ghost btn-sm text-red-500" />
+                <div class="flex">
+                    <x-button icon="o-trash" wire:click="delete({{ $barang['id'] }})"
+                        wire:confirm="Yakin ingin menghapus {{ $barang['name'] }}?" spinner
+                        class="btn-ghost btn-sm text-red-500" />
+                    <x-button icon="o-pencil" link="barangs/{{ $barang['id'] }}/edit"
+                        wire:confirm="Yakin ingin menghapus {{ $barang['name'] }}?" spinner
+                        class="btn-ghost btn-sm text-yellow-500" />
+                </div>
             @endscope
         </x-table>
     </x-card>

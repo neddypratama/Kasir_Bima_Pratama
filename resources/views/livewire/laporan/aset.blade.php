@@ -91,6 +91,7 @@ new class extends Component {
             ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
             ->select(DB::raw('jb.name AS jenis_name'), DB::raw('SUM(td.sub_total) AS total_hpp'))
             ->where('t.type', 'LIKE', 'Stok')
+            ->where('t.status', 'LIKE', 'Lunas')
             ->whereBetween('t.tanggal', [$start, $end])
             ->groupBy('jb.name')
             ->pluck('total_hpp', 'jenis_name');

@@ -48,7 +48,7 @@ new class extends Component {
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-3 rounded-lg p-5">
                     <div>
                         <p class="mb-1 text-gray-500">Barang</p>
-                        <p class="font-semibold">{{ $detail->barang?->name ?? '-' }}</p>
+                        <p class="font-semibold">{{ $detail->barang?->name ?? '-' }} ({{ $detail->satuan?->name ?? '-' }})</p>
                     </div>
 
                     <div>
