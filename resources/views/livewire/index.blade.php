@@ -698,7 +698,7 @@ new class extends Component {
             </x-card>
 
             <!-- Stok Premix -->
-            <x-card class="col-span-10 overflow-x-auto">
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
                 <x-slot:title>Stok Premix</x-slot:title>
                 <div class="w-full min-w-[320px]">
                     <x-chart wire:model="stokPremixChart" />
@@ -706,7 +706,7 @@ new class extends Component {
             </x-card>
 
             <!-- Stok Obat-Obatan RMN -->
-            <x-card class="col-span-10 overflow-x-auto">
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
                 <x-slot:title>Stok Obat-Obatan RMN</x-slot:title>
                 <div class="w-full min-w-[320px]">
                     <x-chart wire:model="stokObatChart" />
