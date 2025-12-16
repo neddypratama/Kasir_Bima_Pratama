@@ -26,6 +26,7 @@ new class extends Component {
     public array $stokPremixChart = [];
     public array $stokObatChart = []; // Obat-Obatan RMN
     public array $stokBarangChart = [];
+    public array $stokKucingChart = [];
 
     public ?int $selectedKategoriPendapatan = null;
     public array $kategoriPendapatanList = [];
@@ -48,6 +49,7 @@ new class extends Component {
         $this->chartStokObat();
         $this->chartStokPremix();
         $this->chartStokBarang();
+        $this->chartStokKucing();
     }
 
     protected function setDefaultDates()
@@ -89,6 +91,7 @@ new class extends Component {
         $this->chartStokObat();
         $this->chartStokPremix();
         $this->chartStokBarang();
+        $this->chartStokKucing();
     }
 
     public function applyDateRange()
@@ -110,6 +113,7 @@ new class extends Component {
         $this->chartStokObat();
         $this->chartStokPremix();
         $this->chartStokBarang();
+        $this->chartStokKucing();
         $this->toast('Periode tanggal berhasil diperbarui', 'success');
     }
 
@@ -278,6 +282,12 @@ new class extends Component {
     {
         $ids = JenisBarang::where('name', 'like', '%Barang%')->pluck('id');
         $this->stokBarangChart = $this->generateChartDataPie($ids, 'Stok Barang');
+    }
+
+    public function chartStokKucing()
+    {
+        $ids = JenisBarang::where('name', 'like', '%Kucing%')->pluck('id');
+        $this->stokKucingChart = $this->generateChartDataPie($ids, 'Stok Pakan Kucing');
     }
 
     /**
@@ -704,10 +714,17 @@ new class extends Component {
             </x-card>
 
             <!-- Stok Barang Umum -->
-            <x-card class="col-span-10 overflow-x-auto">
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
                 <x-slot:title>Stok Barang</x-slot:title>
                 <div class="w-full min-w-[320px]">
                     <x-chart wire:model="stokBarangChart" />
+                </div>
+            </x-card>
+
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
+                <x-slot:title>Stok Pakan Kucing</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokKucingChart" />
                 </div>
             </x-card>
         </div>
