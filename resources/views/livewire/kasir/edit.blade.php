@@ -62,19 +62,17 @@ new class extends Component {
 
         foreach ($transaksi->details as $detail) {
             $barang = $detail->barang;
-            $satuan = KonversiSatuan::find($detail->satuan_id);
 
             // 🔥 stok awal = stok sekarang + qty lama × konversi lama
-            $stokAwal = $barang->stok + $detail->kuantitas * $satuan->konversi;
+            $stokAwal = $barang->stok + $detail->kuantitas;
 
             $this->details[] = [
                 'barang_id' => $barang->id,
-                'satuan' => $satuan->id,
+                'satuan' => $barang->satuan,
                 'value' => $detail->value,
                 'kuantitas' => $detail->kuantitas,
                 'stok_awal' => $stokAwal,
-                'max_qty' => floor($stokAwal / $satuan->konversi),
-                'satuans' => KonversiSatuan::where('barang_id', $barang->id)->get(),
+                'max_qty' => floor($stokAwal),
             ];
         }
 
@@ -96,20 +94,8 @@ new class extends Component {
                 $this->details[$index]['stok_awal'] = $barang->stok;
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
-                $this->details[$index]['value'] = 0;
-                $this->details[$index]['satuan'] = null;
-                $this->details[$index]['satuans'] = KonversiSatuan::where('barang_id', $barang->id)->get();
-            }
-        }
-
-        // pilih satuan
-        if (str_ends_with($key, '.satuan')) {
-            $satuan = KonversiSatuan::find($value);
-
-            if ($satuan) {
-                $stokAwal = $this->details[$index]['stok_awal'];
-                $this->details[$index]['max_qty'] = floor($stokAwal / $satuan->konversi);
-                $this->details[$index]['value'] = $satuan->harga;
+                $this->details[$index]['value'] = $barang->harga;
+                $this->details[$index]['satuan'] = $barang->satuan;
             }
         }
 
@@ -147,8 +133,7 @@ new class extends Component {
             ROLLBACK STOK LAMA
         ====================== */
         foreach ($this->transaksi->details as $detail) {
-            $satuan = KonversiSatuan::find($detail->satuan_id);
-            $detail->barang->increment('stok', $detail->kuantitas * $satuan->konversi);
+            $detail->barang->increment('stok', $detail->kuantitas);
         }
 
         // hapus detail lama
@@ -170,18 +155,16 @@ new class extends Component {
         ====================== */
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
-            $satuan = KonversiSatuan::find($item['satuan']);
 
             DetailTransaksi::create([
                 'transaksi_id' => $this->transaksi->id,
                 'barang_id' => $barang->id,
-                'satuan_id' => $satuan->id,
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
 
-            $barang->decrement('stok', $item['kuantitas'] * $satuan->konversi);
+            $barang->decrement('stok', $item['kuantitas']);
             $totalHPP += $barang->hpp * $item['kuantitas'];
         }
 
@@ -189,12 +172,10 @@ new class extends Component {
 
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
-            $satuan = KonversiSatuan::find($item['satuan']);
 
             DetailTransaksi::create([
                 'transaksi_id' => $this->hpp->id,
                 'barang_id' => $barang->id,
-                'satuan_id' => $satuan->id,
                 'value' => $barang->hpp,
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $barang->hpp * $item['kuantitas'],
@@ -257,10 +238,7 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
-                                    :options="$item['satuans']" option-value="id" option-label="name"
-                                    placeholder="Pilih Satuan" />
-
+                                <x-input label="Satuan" wire:model.live="details.{{ $index }}.satuan" readonly />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
                                 <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"

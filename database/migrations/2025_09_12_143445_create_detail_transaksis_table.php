@@ -14,7 +14,6 @@ return new class extends Migration
             $table->foreignId('barang_id')->nullable()->constrained('barangs');
             $table->decimal('value', 15, 2)->nullable();
             $table->decimal('kuantitas', 10, 2)->nullable();
-            $table->foreignId('satuan_id')->nullable()->constrained('konversi_satuans');
             $table->decimal('sub_total', 15, 2)->nullable();
             $table->timestamps();
         });

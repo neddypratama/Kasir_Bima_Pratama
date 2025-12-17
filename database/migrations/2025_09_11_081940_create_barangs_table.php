@@ -17,7 +17,8 @@ return new class extends Migration
             $table->string('name');
             $table->string('satuan');
             $table->decimal('stok');
-            $table->decimal('hpp')->nullable();
+            $table->decimal('hpp');
+            $table->decimal('harga');
             $table->timestamps();
         });
     }

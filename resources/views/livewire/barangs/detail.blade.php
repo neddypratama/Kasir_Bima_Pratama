@@ -54,9 +54,7 @@ new class extends Component {
 
         {{-- ===================== DETAIL KONVERSI SATUAN ===================== --}}
         <div class="p-7 mt-4 rounded-lg shadow-md">
-            <p class="mb-3 font-semibold">Konversi Satuan</p>
-
-            @forelse ($barang->satuans as $satuan)
+            <p class="mb-3 font-semibold">Detail Barang</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 rounded-lg p-5">
 
                     <div>

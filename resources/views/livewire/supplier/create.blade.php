@@ -83,7 +83,7 @@ new class extends Component {
             $barang = Barang::find($value);
 
             if ($barang) {
-                $this->details[$index]['satuans'] = KonversiSatuan::where('barang_id', $barang->id)->get();
+                $this->details[$index]['satuan'] = $barang->satuan;
             }
         }
 
@@ -104,7 +104,7 @@ new class extends Component {
             'client_id' => 'required',
             'details' => 'required|array|min:1',
             'details.*.barang_id' => 'required|exists:barangs,id',
-            'details.*.satuan' => 'required|exists:konversi_satuans,id',
+            'details.*.satuan' => 'required',
             'details.*.kuantitas' => 'required|numeric|min:1',
         ]);
 
@@ -128,13 +128,12 @@ new class extends Component {
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
-                'satuan_id' => $item['satuan'],
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
 
-            $barang->increment('stok', $item['kuantitas'] * KonversiSatuan::find($item['satuan'])->konversi);
+            $barang->increment('stok', $item['kuantitas']);
         }
 
         $this->success('Transaksi berhasil dibuat!', redirectTo: '/supplier');
@@ -146,7 +145,7 @@ new class extends Component {
             'barang_id' => null,
             'value' => 0,
             'kuantitas' => 1,
-            'satuans' => [],
+            'satuan' => null,
         ];
     }
 
@@ -210,10 +209,7 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
-                                    :options="$item['satuans']" option-value="id" option-label="name"
-                                    placeholder="Pilih Satuan" />
-
+                                <x-input label="Satuan" wire:model.live="details.{{ $index }}.satuan" readonly />
                                 <x-input label="Harga Beli" wire:model.live="details.{{ $index }}.value"
                                     prefix="Rp " money="IDR" />
                                 <x-input label="Qty" type="number" min="1"

@@ -1,7 +1,6 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\KonversiSatuan;
 use App\Models\Transaksi;
 use App\Models\DetailTransaksi;
 use App\Models\Barang;
@@ -30,6 +29,7 @@ new class extends Component {
     #[Rule('required')]
     public ?string $tanggal = null;
 
+    #[Rule('required|array|min:1')]
     public array $details = [];
 
     public $barangs;
@@ -90,30 +90,8 @@ new class extends Component {
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
 
-                $this->details[$index]['satuans'] = KonversiSatuan::where('barang_id', $barang->id)->get();
-
-                $this->details[$index]['satuan'] = null;
-                $this->details[$index]['value'] = 0;
-            }
-        }
-
-        /*
-    |--------------------------------------------------------------------------
-    | PILIH SATUAN
-    |--------------------------------------------------------------------------
-    */
-        if (str_ends_with($key, '.satuan')) {
-            $satuan = KonversiSatuan::find($value);
-
-            if ($satuan) {
-                $barang = Barang::find($this->details[$index]['barang_id']);
-
-                if ($barang) {
-                    // stok dasar / konversi satuan
-                    $this->details[$index]['max_qty'] = floor($barang->stok / $satuan->konversi);
-
-                    $this->details[$index]['value'] = $satuan->harga;
-                }
+                $this->details[$index]['satuan'] = $barang->satuan;
+                $this->details[$index]['value'] = $barang->harga;
             }
         }
 
@@ -146,7 +124,7 @@ new class extends Component {
             'client_id' => 'required',
             'details' => 'required|array|min:1',
             'details.*.barang_id' => 'required|exists:barangs,id',
-            'details.*.satuan' => 'required|exists:konversi_satuans,id',
+            'details.*.satuan' => 'required',
             'details.*.kuantitas' => 'required|numeric|min:1',
         ]);
 
@@ -173,14 +151,13 @@ new class extends Component {
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
-                'satuan_id' => $item['satuan'],
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
 
             $totalHPP += $barang->hpp * $item['kuantitas'];
-            $barang->decrement('stok', $item['kuantitas'] * KonversiSatuan::find($item['satuan'])->konversi);
+            $barang->decrement('stok', $item['kuantitas']);
         }
 
         $hpp = Transaksi::create([
@@ -199,7 +176,6 @@ new class extends Component {
             DetailTransaksi::create([
                 'transaksi_id' => $hpp->id,
                 'barang_id' => $barang->id,
-                'satuan_id' => $item['satuan'],
                 'value' => $barang->hpp,
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $barang->hpp * $item['kuantitas'],
@@ -217,7 +193,6 @@ new class extends Component {
             'value' => 0,
             'kuantitas' => 1,
             'max_qty' => null,
-            'satuans' => [],
         ];
     }
 
@@ -281,10 +256,7 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
-                                    :options="$item['satuans']" option-value="id" option-label="name"
-                                    placeholder="Pilih Satuan" />
-
+                                <x-input label="Satuan" wire:model.live="details.{{ $index }}.satuan" readonly/>
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
                                 <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"

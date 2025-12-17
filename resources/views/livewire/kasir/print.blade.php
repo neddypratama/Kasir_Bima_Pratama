@@ -10,7 +10,7 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
 
     public function mount(Transaksi $transaksi)
     {
-        $this->transaksi = $transaksi->load(['client', 'details.barang', 'details.satuan']);
+        $this->transaksi = $transaksi->load(['client', 'details.barang']);
     }
 };
 ?>
@@ -143,7 +143,7 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
         @foreach ($transaksi->details as $detail)
             <div class="item">
                 <div class="item-name">
-                    {{ strtoupper($detail->barang->name) }} ({{ $detail->satuan->name }})
+                    {{ strtoupper($detail->barang->name) }}
                 </div>
                 <div class="item-row">
                     <span>

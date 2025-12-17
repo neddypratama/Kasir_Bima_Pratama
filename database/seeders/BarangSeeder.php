@@ -60,7 +60,8 @@ class BarangSeeder extends Seeder
                     'name' => $barang,
                     'stok' => 0,
                     'satuan' => 'Kg',
-                    'hpp' => null,
+                    'hpp' => 0,
+                    'harga' => 0,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
