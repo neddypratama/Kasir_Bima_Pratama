@@ -70,7 +70,6 @@ new class extends Component {
             } else {
                 $satuan = 'Sak';
             }
-            
 
             // 🔥 stok awal = stok sekarang + qty lama × konversi lama
             $stokAwal = $barang->stok + $detail->kuantitas;
@@ -103,6 +102,12 @@ new class extends Component {
                 $this->details[$index]['stok_awal'] = $barang->stok;
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
+
+                if ($this->details[$index]['satuan'] == 'Eceran') {
+                    $this->details[$index]['value'] = $barang->harga_eceran;
+                } else {
+                    $this->details[$index]['value'] = $barang->harga_sak;
+                }
             }
         }
 
@@ -257,11 +262,12 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan" :options="$satuan" placeholder="Pilih Satuan" />
+                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
+                                    :options="$satuan" placeholder="Pilih Satuan" />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
-                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1" step="0.01"
-                                    wire:model.lazy="details.{{ $index }}.kuantitas" />
+                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
+                                    step="0.01" wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"
                                     readonly />

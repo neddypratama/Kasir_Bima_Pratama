@@ -90,6 +90,12 @@ new class extends Component {
             if ($barang) {
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
+
+                if ($this->details[$index]['satuan'] == 'Eceran') {
+                    $this->details[$index]['value'] = $barang->harga_eceran;
+                } else {
+                    $this->details[$index]['value'] = $barang->harga_sak;
+                }
             }
         }
 
@@ -140,7 +146,7 @@ new class extends Component {
 
         $client = Client::find($this->client_id);
         $status = $client->name == 'Quest' && $this->uang >= $this->total ? 'Lunas' : 'Hutang';
-        
+
         $kasir = Transaksi::create([
             'invoice' => $this->invoice,
             'user_id' => $this->user_id,
@@ -157,7 +163,7 @@ new class extends Component {
 
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
-            
+
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
@@ -266,11 +272,12 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan" :options="$satuan" placeholder="Pilih Satuan" />
+                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
+                                    :options="$satuan" placeholder="Pilih Satuan" />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
-                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1" step="0.01"
-                                    wire:model.lazy="details.{{ $index }}.kuantitas" />
+                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
+                                    step="0.01" wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"
                                     readonly />
