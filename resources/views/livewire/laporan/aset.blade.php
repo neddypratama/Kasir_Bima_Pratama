@@ -54,19 +54,19 @@ new class extends Component {
         // 📌 MAPPING BESAR SESUAI PERMINTAAN
         $mappingStok = [
             'Stok Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
-            'Stok Obat' => ['Obat-Obatan RMN'],
+            'Stok Obat' => ['Obat-Obatan RMN', 'Obat-Obatan Unggas'],
             'Stok Barang' => ['Barang'],
         ];
 
         $mappingPendapatan = [
             'Bon Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
-            'Bon Obat' => ['Obat-Obatan RMN'],
+            'Bon Obat' => ['Obat-Obatan RMN', 'Obat-Obatan Unggas'],
             'Bon Barang' => ['Barang'],
         ];
 
         $mappingPengeluaran = [
             'Hutang Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
-            'Hutang Obat' => ['Obat-Obatan RMN'],
+            'Hutang Obat' => ['Obat-Obatan RMN', 'Obat-Obatan Unggas'],
             'Hutang Barang' => ['Barang'],
         ];
 
