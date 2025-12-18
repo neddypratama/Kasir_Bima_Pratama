@@ -39,7 +39,7 @@ new class extends Component {
         return [
             'barangs' => $this->barangs,
             'clients' => Client::where('keterangan', 'like', '%Pembeli%')->get(),
-            'satuan' => [['id' => 'Kg', 'name' => 'Kg'], ['id' => 'Sak', 'name' => 'Sak']],
+            'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
         ];
     }
 
@@ -110,7 +110,7 @@ new class extends Component {
             $barang = Barang::find($this->details[$index]['barang_id']);
 
             if ($barang) {
-                if ($this->details[$index]['satuan'] == 'Kg') {
+                if ($this->details[$index]['satuan'] == 'Eceran') {
                     $this->details[$index]['value'] = $barang->harga_eceran;
                 } else {
                     $this->details[$index]['value'] = $barang->harga_sak;
