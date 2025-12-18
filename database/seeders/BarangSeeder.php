@@ -59,9 +59,9 @@ class BarangSeeder extends Seeder
                     'jenis_id' => $jenisBarangIds[$jenis],
                     'name' => $barang,
                     'stok' => 0,
-                    'satuan' => 'Kg',
                     'hpp' => 0,
-                    'harga' => 0,
+                    'harga_eceran' => 0,
+                    'harga_sak' => 0,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

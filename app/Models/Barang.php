@@ -12,9 +12,9 @@ class Barang extends Model
         'name',
         'jenis_id',
         'stok',
-        'satuan',
         'hpp',
-        'harga'
+        'harga_eceran',
+        'harga_sak',
     ];
 
     public function jenis()

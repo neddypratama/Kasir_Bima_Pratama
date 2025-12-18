@@ -21,14 +21,14 @@ new class extends Component {
     #[Rule('required|numeric|min:0')]
     public float $stok = 0.0;
 
-    #[Rule('required|string')]
-    public string $satuan = '';
+    #[Rule('nullable|numeric|min:0')]
+    public float $eceran = 0.0;
 
     #[Rule('nullable|numeric|min:0')]
     public float $hpp = 0.0;
 
     #[Rule('nullable|numeric|min:0')]
-    public float $harga = 0.0;
+    public float $sak = 0.0;
 
     public function with(): array
     {
@@ -44,14 +44,14 @@ new class extends Component {
         $this->name = $barang->name;
         $this->jenis_id = $barang->jenis_id;
         $this->stok = $barang->stok;
-        $this->satuan = $barang->satuan;
+        $this->eceran = $barang->harga_eceran;
         $this->hpp = $barang->hpp ?? 0;
-        $this->harga = $barang->harga ?? 0;
+        $this->sak = $barang->harga_sak ?? 0;
     }
 
     public function save(): void
     {
-        $this->validate(); 
+        $this->validate();
 
         $barang = Barang::find($this->barang->id);
 
@@ -59,9 +59,9 @@ new class extends Component {
             'name' => $this->name,
             'jenis_id' => $this->jenis_id,
             'stok' => $this->stok,
-            'satuan' => $this->satuan,
             'hpp' => $this->hpp,
-            'harga' => $this->harga,
+            'harga_eceran' => $this->eceran,
+            'harga_sak' => $this->sak,
         ]);
 
         $this->success('Barang berhasil dibuat!', redirectTo: '/barangs');
@@ -71,7 +71,7 @@ new class extends Component {
 ?>
 
 <div>
-    <x-header title="Edit {{$barang->name}}" separator />
+    <x-header title="Edit {{ $barang->name }}" separator />
 
     <x-form wire:submit="save">
 
@@ -86,7 +86,7 @@ new class extends Component {
                     <x-input label="Nama Barang" wire:model="name" placeholder="Contoh: Dog Food Premium" />
                     <x-select label="Jenis Barang" wire:model="jenis_id" :options="$jenisbarang" option-label="name"
                         option-value="id" placeholder="Pilih jenis barang" />
-                    <x-input label="Harga Pokok (HPP)" wire:model="hpp" prefix="Rp " money="IDR" />
+                    <x-input label="Stok" wire:model="stok" type="number" min="0" step="0.01" />
 
                 </div>
             </div>
@@ -100,12 +100,11 @@ new class extends Component {
                 <x-header title="Details" subtitle="Informasi lengkap barang" size="text-2xl" />
             </div>
             <div class="col-span-5 grid gap-3">
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div class="col-span-2">
-                        <x-input label="Harga Jual" wire:model="harga" prefix="Rp " money="IDR" />
-                    </div>
-                    <x-input label="Stok" wire:model="stok" type="number" min="0" step="0.01" />
-                    <x-input label="Satuan Dasar" wire:model.live="satuan" placeholder="Contoh: Kg" />
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <x-input label="Harga Pokok (HPP)" wire:model="hpp" prefix="Rp " money="IDR" />
+                    <x-input label="Harga Eceran" wire:model="eceran" prefix="Rp " money="IDR" />
+                    <x-input label="Harga Sak" wire:model="sak" prefix="Rp " money="IDR" />
+
                 </div>
             </div>
         </div>

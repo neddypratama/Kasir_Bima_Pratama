@@ -22,14 +22,14 @@ new class extends Component {
     #[Rule('required|numeric|min:0')]
     public float $stok = 0.0;
 
-    #[Rule('required|string')]
-    public string $satuan = '';
+    #[Rule('required|numeric|min:0')]
+    public float $eceran = 0.0;
 
     #[Rule('nullable|numeric|min:0')]
     public float $hpp = 0.0;
 
     #[Rule('nullable|numeric|min:0')]
-    public float $harga = 0.0;
+    public float $sak = 0.0;
 
     public function with(): array
     {
@@ -40,15 +40,15 @@ new class extends Component {
 
     public function save(): void
     {
-        $this->validate(); 
+        $this->validate();
 
         $barang = Barang::create([
             'name' => $this->name,
             'jenis_id' => $this->jenis_id,
             'stok' => $this->stok,
-            'satuan' => $this->satuan,
             'hpp' => $this->hpp,
-            'harga' => $this->harga,
+            'harga_eceran' => $this->eceran,
+            'harga_sak' => $this->sak,
         ]);
 
         $this->success('Barang berhasil dibuat!', redirectTo: '/barangs');
@@ -87,12 +87,10 @@ new class extends Component {
                 <x-header title="Details" subtitle="Informasi lengkap barang" size="text-2xl" />
             </div>
             <div class="col-span-5 grid gap-3">
-                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div class="col-span-2">
-                        <x-input label="Harga Jual" wire:model="harga" prefix="Rp " money="IDR" />
-                    </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <x-input label="Harga Eceran" wire:model="eceran" prefix="Rp " money="IDR" />
+                    <x-input label="Harga Sak" wire:model="sak" prefix="Rp " money="IDR" />
                     <x-input label="Stok" wire:model="stok" type="number" min="0" step="0.01" />
-                    <x-input label="Satuan Dasar" wire:model.live="satuan" placeholder="Contoh: Kg" />
                 </div>
             </div>
         </div>

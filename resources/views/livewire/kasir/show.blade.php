@@ -62,7 +62,7 @@ new class extends Component {
 
                     <div>
                         <p class="mb-1 text-gray-500">Qty</p>
-                        <p class="font-semibold">{{ $detail->kuantitas }} ({{ $detail->barang?->satuan ?? '-' }})</p>
+                        <p class="font-semibold">{{ $detail->kuantitas }} </p>
                     </div>
 
                     <div>
@@ -148,7 +148,7 @@ new class extends Component {
 
                     <div>
                         <p class="mb-1 text-gray-500">Qty</p>
-                        <p class="font-semibold">{{ $detail->kuantitas }} ({{ $detail->barang?->satuan ?? '-' }})</p>
+                        <p class="font-semibold">{{ $detail->kuantitas }} </p>
                     </div>
 
                     <div>

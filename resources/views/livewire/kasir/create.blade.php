@@ -42,6 +42,7 @@ new class extends Component {
         return [
             'barangs' => $this->barangs,
             'clients' => Client::where('keterangan', 'like', '%Pembeli%')->get(),
+            'satuan' => [['id' => 'Kg', 'name' => 'Kg'], ['id' => 'Sak', 'name' => 'Sak']],
         ];
     }
 
@@ -89,9 +90,18 @@ new class extends Component {
             if ($barang) {
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
+            }
+        }
 
-                $this->details[$index]['satuan'] = $barang->satuan;
-                $this->details[$index]['value'] = $barang->harga;
+        if (str_ends_with($key, '.satuan')) {
+            $barang = Barang::find($this->details[$index]['barang_id']);
+
+            if ($barang) {
+                if ($this->details[$index]['satuan'] == 'Kg') {
+                    $this->details[$index]['value'] = $barang->harga_eceran;
+                } else {
+                    $this->details[$index]['value'] = $barang->harga_sak;
+                }
             }
         }
 
@@ -130,7 +140,7 @@ new class extends Component {
 
         $client = Client::find($this->client_id);
         $status = $client->name == 'Quest' && $this->uang >= $this->total ? 'Lunas' : 'Hutang';
-
+        
         $kasir = Transaksi::create([
             'invoice' => $this->invoice,
             'user_id' => $this->user_id,
@@ -147,7 +157,7 @@ new class extends Component {
 
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
-
+            
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
@@ -256,10 +266,10 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-input label="Satuan" wire:model.live="details.{{ $index }}.satuan" readonly/>
+                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan" :options="$satuan" placeholder="Pilih Satuan" />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
-                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
+                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1" step="0.01"
                                     wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"

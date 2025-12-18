@@ -58,7 +58,7 @@ new class extends Component {
 
             $this->details[] = [
                 'barang_id' => $barang->id,
-                'satuan' => $barang->satuan,
+                'satuan' => 'Kg',
                 'value' => $detail->value,
                 'kuantitas' => $detail->kuantitas,
             ];
@@ -79,7 +79,7 @@ new class extends Component {
             $barang = Barang::find($value);
 
             if ($barang) {
-                $this->details[$index]['satuan'] = $barang->satuan;
+                $this->details[$index]['satuan'] = 'Kg';
             }
         }
 
@@ -200,7 +200,7 @@ new class extends Component {
                                 <x-input label="Satuan" wire:model.live="details.{{ $index }}.satuan" readonly />
                                 <x-input label="Harga Beli" wire:model.live="details.{{ $index }}.value"
                                     prefix="Rp " money="IDR" />
-                                <x-input label="Qty" type="number" min="1"
+                                <x-input label="Qty" type="number" min="1" step="0.01"
                                     wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"
