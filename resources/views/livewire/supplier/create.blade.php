@@ -136,6 +136,28 @@ new class extends Component {
             $barang->increment('stok', $item['kuantitas']);
         }
 
+        $barangIds = collect($this->details)->pluck('barang_id')->unique();
+
+        foreach ($barangIds as $id) {
+            $barang = Barang::find($id);
+            if (!$barang) {
+                continue;
+            }
+
+            $data = DetailTransaksi::where('barang_id', $barang->id)
+            ->whereHas('transaksi', fn($q) => $q->where('type', 'Stok'))
+            ->selectRaw('SUM(kuantitas) as total_kuantitas, SUM(value * kuantitas) as total_harga')
+            ->first();
+
+            $stokDebit = $data->total_kuantitas ?? 0;
+            $totalHarga = $data->total_harga ?? 0;
+            $hppBaru = $stokDebit > 0 ? $totalHarga / $stokDebit : 0;
+
+            $barang->update([
+                'hpp' => $hppBaru,
+            ]);
+        }
+
         $this->success('Transaksi berhasil dibuat!', redirectTo: '/supplier');
     }
 

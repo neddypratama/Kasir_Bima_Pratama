@@ -103,7 +103,7 @@ new class extends Component {
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <x-input label="Harga Pokok (HPP)" wire:model="hpp" prefix="Rp " money="IDR" />
                     <x-input label="Harga Eceran" wire:model="eceran" prefix="Rp " money="IDR" />
-                    <x-input label="Harga Sak" wire:model="sak" prefix="Rp " money="IDR" />
+                    <x-input label="Harga Partai" wire:model="sak" prefix="Rp " money="IDR" />
 
                 </div>
             </div>

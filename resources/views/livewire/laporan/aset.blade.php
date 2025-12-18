@@ -85,6 +85,17 @@ new class extends Component {
             ->groupBy('jb.name')
             ->pluck('total_jual', 'jenis_name');
 
+        $hppResults = DB::table('detail_transaksis as td')
+            ->join('barangs as b', 'b.id', '=', 'td.barang_id')
+            ->join('jenis_barangs as jb', 'jb.id', '=', 'b.jenis_id')
+            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
+            ->select(DB::raw('jb.name AS jenis_name'), DB::raw('SUM(td.sub_total) AS total_hpp'))
+            ->where('t.type', 'LIKE', 'Debit')
+            ->where('t.status', 'LIKE', 'Lunas')
+            ->whereBetween('t.tanggal', [$start, $end])
+            ->groupBy('jb.name')
+            ->pluck('total_hpp', 'jenis_name');
+
         $stokResults = DB::table('detail_transaksis as td')
             ->join('barangs as b', 'b.id', '=', 'td.barang_id')
             ->join('jenis_barangs as jb', 'jb.id', '=', 'b.jenis_id')
@@ -114,11 +125,13 @@ new class extends Component {
             $bon = (float) ($penjualanResults[$jenis] ?? 0);
             $hutang = (float) ($hutangResults[$jenis] ?? 0);
             $stok = (float) ($stokResults[$jenis] ?? 0);
+            $hpp = (float) ($hppResults[$jenis] ?? 0);
 
             $report[$jenis] = [
                 'bon' => $bon,
                 'hutang' => $hutang,
                 'stok' => $stok,
+                'hpp' => $hpp,
             ];
         }
 
@@ -170,7 +183,7 @@ new class extends Component {
             $total = 0;
 
             foreach ($jenisArray as $jenis) {
-                $jumlah = $report[$jenis]['stok'] ?? 0;
+                $jumlah = ($report[$jenis]['stok'] ?? 0) - ($report[$jenis]['hpp'] ?? 0);
                 $key = "Stok $jenis";
                 $detail[$key] = $jumlah;
                 $total += $jumlah;
