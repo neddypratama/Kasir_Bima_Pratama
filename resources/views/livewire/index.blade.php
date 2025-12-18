@@ -297,7 +297,7 @@ new class extends Component {
     public function chartStokUnggas()
     {
         $ids = JenisBarang::where('name', 'like', '%Obat-Obatan Unggas%')->pluck('id');
-        $this->stokObatChart = $this->generateChartDataBar($ids, 'Stok Obat-Obatan Unggas');
+        $this->stokUnggasChart = $this->generateChartDataBar($ids, 'Stok Obat-Obatan Unggas');
     }
 
     /**
