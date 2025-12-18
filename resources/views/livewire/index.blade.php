@@ -27,6 +27,7 @@ new class extends Component {
     public array $stokObatChart = []; // Obat-Obatan RMN
     public array $stokBarangChart = [];
     public array $stokKucingChart = [];
+    public array $stokUnggasChart = [];
 
     public ?int $selectedKategoriPendapatan = null;
     public array $kategoriPendapatanList = [];
@@ -50,6 +51,7 @@ new class extends Component {
         $this->chartStokPremix();
         $this->chartStokBarang();
         $this->chartStokKucing();
+        $this->chartStokUnggas();
     }
 
     protected function setDefaultDates()
@@ -92,6 +94,7 @@ new class extends Component {
         $this->chartStokPremix();
         $this->chartStokBarang();
         $this->chartStokKucing();
+        $this->chartStokUnggas();
     }
 
     public function applyDateRange()
@@ -114,6 +117,7 @@ new class extends Component {
         $this->chartStokPremix();
         $this->chartStokBarang();
         $this->chartStokKucing();
+        $this->chartStokUnggas();
         $this->toast('Periode tanggal berhasil diperbarui', 'success');
     }
 
@@ -288,6 +292,12 @@ new class extends Component {
     {
         $ids = JenisBarang::where('name', 'like', '%Kucing%')->pluck('id');
         $this->stokKucingChart = $this->generateChartDataPie($ids, 'Stok Pakan Kucing');
+    }
+
+    public function chartStokUnggas()
+    {
+        $ids = JenisBarang::where('name', 'like', '%Obat-Obatan Unggas%')->pluck('id');
+        $this->stokObatChart = $this->generateChartDataBar($ids, 'Stok Obat-Obatan Unggas');
     }
 
     /**
@@ -725,6 +735,14 @@ new class extends Component {
                 <x-slot:title>Stok Pakan Kucing</x-slot:title>
                 <div class="w-full min-w-[320px]">
                     <x-chart wire:model="stokKucingChart" />
+                </div>
+            </x-card>
+
+            <!-- Stok Obat-Obatan Unggas -->
+            <x-card class="col-span-10 md:col-span-5 overflow-x-auto">
+                <x-slot:title>Stok Obat-Obatan Unggas</x-slot:title>
+                <div class="w-full min-w-[320px]">
+                    <x-chart wire:model="stokUnggasChart" />
                 </div>
             </x-card>
         </div>
