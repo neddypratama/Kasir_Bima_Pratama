@@ -148,11 +148,12 @@ new class extends Component {
     public function transaksi(): LengthAwarePaginator
     {
         return Transaksi::query()
-            ->with(['client:id,name,keterangan'])
+            ->with(['client:id,name,keterangan', 'details.barang:id,name'])
             ->where('type', 'Kredit')
             ->when($this->search, function (Builder $q) {
                 $q->where(function ($query) {
-                    $query->where('invoice', 'like', "%{$this->search}%");
+                    $query->where('invoice', 'like', "%{$this->search}%")
+                    ->orWhereRelation('details.barang', 'name', 'like', "%{$this->search}%");
                 });
             })
             ->when($this->client_id, fn(Builder $q) => $q->where('client_id', $this->client_id))
