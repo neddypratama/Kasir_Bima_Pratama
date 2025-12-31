@@ -31,6 +31,7 @@ new class extends Component {
     public array $sortBy = ['column' => 'id', 'direction' => 'desc'];
     public int $filter = 0;
     public int $client_id = 0;
+    public int $barang_id = 0;
 
     public bool $exportModal = false; // ✅ Modal export
     // ✅ Tambah tanggal untuk filter export
@@ -150,27 +151,41 @@ new class extends Component {
         return Transaksi::query()
             ->with(['client:id,name,keterangan', 'details.barang:id,name'])
             ->where('type', 'Kredit')
+
+            // 🔍 SEARCH INVOICE
             ->when($this->search, function (Builder $q) {
-                $q->where(function ($query) {
-                    $query->where('invoice', 'like', "%{$this->search}%")
-                    ->orWhereRelation('details.barang', 'name', 'like', "%{$this->search}%");
+                $q->where('invoice', 'like', "%{$this->search}%");
+            })
+
+            // 📦 FILTER BARANG (BENAR)
+            ->when($this->barang_id, function (Builder $q) {
+                $q->whereHas('details', function ($q2) {
+                    $q2->where('barang_id', $this->barang_id);
                 });
             })
+
+            // 👤 FILTER CLIENT
             ->when($this->client_id, fn(Builder $q) => $q->where('client_id', $this->client_id))
+
+            // 📅 FILTER TANGGAL
             ->when($this->startDate, fn(Builder $q) => $q->whereDate('tanggal', '>=', $this->startDate))
             ->when($this->endDate, fn(Builder $q) => $q->whereDate('tanggal', '<=', $this->endDate))
+
             ->orderBy(...array_values($this->sortBy))
             ->paginate($this->perPage);
     }
 
     public function with(): array
     {
-        if ($this->filter >= 0 && $this->filter < 3) {
+        if ($this->filter >= 0 && $this->filter < 4) {
             $this->filter = 0;
             if (!empty($this->search)) {
                 $this->filter++;
             }
             if ($this->client_id != 0) {
+                $this->filter++;
+            }
+            if ($this->barang_id != 0) {
                 $this->filter++;
             }
             if ($this->startDate != null) {
@@ -180,6 +195,7 @@ new class extends Component {
 
         return [
             'transaksi' => $this->transaksi(),
+            'barang' => Barang::all(),
             'client' => Client::where('keterangan', 'Pembeli')->get(),
             'headers' => $this->headers(),
             'perPage' => $this->perPage,
@@ -261,6 +277,9 @@ new class extends Component {
                 icon="o-magnifying-glass" />
 
             <x-choices-offline placeholder="Pilih Client" wire:model.live="client_id" :options="$client" icon="o-user"
+                single searchable />
+
+            <x-choices-offline placeholder="Pilih Barang" wire:model.live="barang_id" :options="$barang" icon="o-flag"
                 single searchable />
 
             <!-- ✅ Tambahkan Filter Tanggal -->
