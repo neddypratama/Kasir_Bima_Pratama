@@ -88,6 +88,8 @@
                         <x-menu-item title="Jenis Barang" icon="fas.archive" link="/jenisbarangs" />
                         <x-menu-item title="Barang" icon="fas.box" link="/barangs" />
                         <x-menu-item title="Klien" icon="fas.users" link="/clients" />
+                        <x-menu-item title="Kategori" icon="fas.tags" link="/kategori" />
+                        <x-menu-item title="Detail Kategori" icon="fas.calendar-day" link="/detail" />
                         <x-menu-item title="Transaksi" icon="fas.cart-shopping" link="/transaksis" />
                     </x-menu-sub>
                 @endif
@@ -105,6 +107,7 @@
                         {{-- <x-menu-item title="Laporan Penjualan" icon="fas.store" link="/laporan-penjualan" /> --}}
                         <x-menu-item title="Penjualan" icon="fas.cart-plus" link="/kasir" />
                         <x-menu-item title="Pembelian" icon="fas.sack-dollar" link="/supplier" />
+                        <x-menu-item title="Pengeluaran" icon="fas.circle-dollar-to-slot" link="/keluar" />
                     @endif
                 </x-menu-sub>
 

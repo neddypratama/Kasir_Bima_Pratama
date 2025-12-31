@@ -2,25 +2,24 @@
 
 use Livewire\Volt\Component;
 use App\Models\Transaksi;
-use Maatwebsite\Excel\Facades\Excel;
-use App\Exports\LabaRugiExport;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Illuminate\Support\Str;
 
 new class extends Component {
-    public $startDate;
-    public $endDate;
+    public ?string $startDate = null;
+    public ?string $endDate = null;
 
-    public $pendapatanData = [];
-    public $stokData = [];
-    public $pengeluaranData = [];
-    public $expanded = []; // toggle detail
+    public array $bonData = [];
+    public array $hutangData = [];
+    public array $stokData = [];
+    public array $expanded = [];
 
+    /* ======================
+        MOUNT
+    ====================== */
     public function mount()
     {
-        $this->startDate = null;
-        $this->endDate = null;
         $this->generateReport();
     }
 
@@ -31,193 +30,166 @@ new class extends Component {
         }
     }
 
-    public function export(): BinaryFileResponse
-    {
-        return Excel::download(new LabaRugiExport($this->startDate, $this->endDate), 'laba_rugi.xlsx');
-    }
-
+    /* ======================
+        GENERATE REPORT
+    ====================== */
     public function generateReport()
     {
-        // ambil tanggal awal & akhir transaksi jika filter null
-        $firstTransaction = Transaksi::orderBy('tanggal', 'asc')->first();
-        $lastTransaction = Transaksi::orderBy('tanggal', 'desc')->first();
+        $first = Transaksi::orderBy('tanggal')->first();
+        $last = Transaksi::orderByDesc('tanggal')->first();
 
-        if (!$firstTransaction || !$lastTransaction) {
-            $this->pendapatanData = [];
-            $this->pengeluaranData = [];
+        if (!$first || !$last) {
+            $this->bonData = [];
+            $this->hutangData = [];
+            $this->stokData = [];
             return;
         }
 
-        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : Carbon::parse($firstTransaction->tanggal)->startOfDay();
-        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : Carbon::parse($lastTransaction->tanggal)->endOfDay();
+        $start = $this->startDate ? Carbon::parse($this->startDate)->startOfDay() : Carbon::parse($first->tanggal)->startOfDay();
 
-        // 📌 MAPPING BESAR SESUAI PERMINTAAN
-        $mappingStok = [
-            'Stok Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
-            'Stok Obat' => ['Obat-Obatan RMN', 'Obat-Obatan Unggas'],
-            'Stok Barang' => ['Barang'],
-        ];
+        $end = $this->endDate ? Carbon::parse($this->endDate)->endOfDay() : Carbon::parse($last->tanggal)->endOfDay();
 
-        $mappingPendapatan = [
-            'Bon Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
-            'Bon Obat' => ['Obat-Obatan RMN', 'Obat-Obatan Unggas'],
-            'Bon Barang' => ['Barang'],
-        ];
+        /* =====================================================
+            1. AMBIL LAPORAN + KATEGORI (MASTER)
+        ===================================================== */
+        $laporans = DB::table('laporans')->leftJoin('kategoris', 'kategoris.laporan_id', '=', 'laporans.id')->select('laporans.id as laporan_id', 'laporans.name as laporan', 'laporans.type', 'kategoris.id as kategori_id', 'kategoris.name as kategori')->orderBy('laporans.id')->orderBy('kategoris.name')->get();
 
-        $mappingPengeluaran = [
-            'Hutang Pakan' => ['Hijauan', 'Konsentrat', 'Bahan Baku Konsentrat', 'Premix', 'Pakan Kucing'],
-            'Hutang Obat' => ['Obat-Obatan RMN', 'Obat-Obatan Unggas'],
-            'Hutang Barang' => ['Barang'],
-        ];
-
-        // 🟢 Ambil semua jenis barang (master) agar 0 tetap tampil
-        $masterJenis = DB::table('jenis_barangs')->orderBy('name', 'asc')->pluck('name');
-
-        // 🟡 Query PENJUALAN (Pendapatan) per jenis barang
-        $penjualanResults = DB::table('detail_transaksis as td')
-            ->join('barangs as b', 'b.id', '=', 'td.barang_id')
-            ->join('jenis_barangs as jb', 'jb.id', '=', 'b.jenis_id')
-            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
-            ->select(DB::raw('jb.name AS jenis_name'), DB::raw('SUM(td.sub_total) AS total_jual'))
-            ->where('t.type', 'LIKE', 'Kredit')
-            ->where('t.status', 'LIKE', 'Hutang')
-            ->whereBetween('t.tanggal', [$start, $end])
-            ->groupBy('jb.name')
-            ->pluck('total_jual', 'jenis_name');
-
-        $hppResults = DB::table('detail_transaksis as td')
-            ->join('barangs as b', 'b.id', '=', 'td.barang_id')
-            ->join('jenis_barangs as jb', 'jb.id', '=', 'b.jenis_id')
-            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
-            ->select(DB::raw('jb.name AS jenis_name'), DB::raw('SUM(td.sub_total) AS total_hpp'))
-            ->where('t.type', 'LIKE', 'Debit')
-            ->where('t.status', 'LIKE', 'Lunas')
-            ->whereBetween('t.tanggal', [$start, $end])
-            ->groupBy('jb.name')
-            ->pluck('total_hpp', 'jenis_name');
-
-        $stokResults = DB::table('detail_transaksis as td')
-            ->join('barangs as b', 'b.id', '=', 'td.barang_id')
-            ->join('jenis_barangs as jb', 'jb.id', '=', 'b.jenis_id')
-            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
-            ->select(DB::raw('jb.name AS jenis_name'), DB::raw('SUM(td.sub_total) AS total_hpp'))
-            ->where('t.type', 'LIKE', 'Stok')
-            ->where('t.status', 'LIKE', 'Lunas')
-            ->whereBetween('t.tanggal', [$start, $end])
-            ->groupBy('jb.name')
-            ->pluck('total_hpp', 'jenis_name');
-
-        // 🔴 Query HPP (Pengeluaran) per jenis barang
-        $hutangResults = DB::table('detail_transaksis as td')
-            ->join('barangs as b', 'b.id', '=', 'td.barang_id')
-            ->join('jenis_barangs as jb', 'jb.id', '=', 'b.jenis_id')
-            ->join('transaksis as t', 't.id', '=', 'td.transaksi_id')
-            ->select(DB::raw('jb.name AS jenis_name'), DB::raw('SUM(td.sub_total) AS total_hpp'))
-            ->where('t.type', 'LIKE', 'Stok')
-            ->where('t.status', 'LIKE', 'Hutang')
-            ->whereBetween('t.tanggal', [$start, $end])
-            ->groupBy('jb.name')
-            ->pluck('total_hpp', 'jenis_name');
-
-        // ⚪ Susun report final per master jenis barang
-        $report = [];
-        foreach ($masterJenis as $jenis) {
-            $bon = (float) ($penjualanResults[$jenis] ?? 0);
-            $hutang = (float) ($hutangResults[$jenis] ?? 0);
-            $stok = (float) ($stokResults[$jenis] ?? 0);
-            $hpp = (float) ($hppResults[$jenis] ?? 0);
-
-            $report[$jenis] = [
-                'bon' => $bon,
-                'hutang' => $hutang,
-                'stok' => $stok,
-                'hpp' => $hpp,
-            ];
-        }
-
-        // 🟢 BANGUN DATA PENDAPATAN SESUAI KELOMPOK MAPPING
-        $this->pendapatanData = [];
-        foreach ($mappingPendapatan as $kelompok => $jenisArray) {
-            $detail = [];
-            $total = 0;
-
-            foreach ($jenisArray as $jenis) {
-                $jumlah = $report[$jenis]['bon'] ?? 0;
-                $key = "Bon $jenis";
-                $detail[$key] = $jumlah;
-                $total += $jumlah;
-            }
-
-            $this->pendapatanData[$kelompok] = [
-                'total' => $total,
-                'detail' => $detail,
-            ];
-
-            $this->expanded[$kelompok] = false;
-        }
-
-        // 🔴 BANGUN DATA PENGELUARAN SESUAI KELOMPOK MAPPING
-        $this->pengeluaranData = [];
-        foreach ($mappingPengeluaran as $kelompok => $jenisArray) {
-            $detail = [];
-            $total = 0;
-
-            foreach ($jenisArray as $jenis) {
-                $jumlah = $report[$jenis]['hutang'] ?? 0;
-                $key = "Hutang $jenis";
-                $detail[$key] = $jumlah;
-                $total += $jumlah;
-            }
-
-            $this->pengeluaranData[$kelompok] = [
-                'total' => $total,
-                'detail' => $detail,
-            ];
-
-            $this->expanded[$kelompok] = false;
-        }
-
+        /* =====================================================
+            2. INIT SEMUA DATA = 0
+        ===================================================== */
+        $this->bonData = [];
+        $this->hutangData = [];
         $this->stokData = [];
-        foreach ($mappingStok as $kelompok => $jenisArray) {
-            $detail = [];
-            $total = 0;
 
-            foreach ($jenisArray as $jenis) {
-                $jumlah = ($report[$jenis]['stok'] ?? 0) - ($report[$jenis]['hpp'] ?? 0);
-                $key = "Stok $jenis";
-                $detail[$key] = $jumlah;
-                $total += $jumlah;
+        foreach ($laporans as $row) {
+            /* ======================
+                PENDAPATAN → BON
+            ====================== */
+            if ($row->type === 'Pendapatan') {
+                if (Str::startsWith($row->laporan, 'Penjualan ')) {
+                    $nama = Str::after($row->laporan, 'Penjualan ');
+                    $row->laporan = 'Bon ' . $nama;
+                }
+                // ambil kata setelah "Penjualan "
+                if (Str::startsWith($row->kategori, 'Penjualan ')) {
+                    $nama = Str::after($row->kategori, 'Penjualan ');
+                    $row->kategori = 'Bon ' . $nama;
+                }
+
+                $this->bonData[$row->laporan]['detail'][$row->kategori] = 0;
+                $this->bonData[$row->laporan]['total'] ??= 0;
             }
 
-            $this->stokData[$kelompok] = [
-                'total' => $total,
-                'detail' => $detail,
-            ];
+            /* ======================
+                ASET → STOK (ASLI)
+            ====================== */
+            if ($row->type === 'Aset') {
+                $this->stokData[$row->laporan]['detail'][$row->kategori] = 0;
+                $this->stokData[$row->laporan]['total'] ??= 0;
+            }
 
-            $this->expanded[$kelompok] = false;
+            /* ======================
+                ASET → HUTANG
+            ====================== */
+            if ($row->type === 'Aset') {
+                if (Str::startsWith($row->laporan, 'Stok ')) {
+                    $nama = Str::after($row->laporan, 'Stok ');
+                    $row->laporan = 'Hutang ' . $nama;
+                }
+                // ambil kata setelah "Stok "
+                if (Str::startsWith($row->kategori, 'Stok ')) {
+                    $nama = Str::after($row->kategori, 'Stok ');
+                    $row->kategori = 'Hutang ' . $nama;
+                }
+
+                $this->hutangData[$row->laporan]['detail'][$row->kategori] = 0;
+                $this->hutangData[$row->laporan]['total'] ??= 0;
+            }
+        }
+
+        // dd($this->bonData, $this->hutangData, $this->stokData, $laporans);
+
+        /* =====================================================
+    3. AMBIL NILAI TRANSAKSI
+===================================================== */
+        $rows = DB::table('detail_transaksis as dt')
+            ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
+            ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
+            ->join('transaksis as t', 't.id', '=', 'dt.transaksi_id')
+            ->select('l.name as laporan', 'l.type', 'k.name as kategori', 't.type as transaksi_type', 't.status', DB::raw('SUM(dt.sub_total) as total'))
+            ->whereBetween('t.tanggal', [$start, $end])
+            ->groupBy('l.name', 'l.type', 'k.name', 't.type', 't.status')
+            ->get();
+
+        /* =====================================================
+    4. ISI NILAI KE STRUKTUR (TRANSFORM NAMA)
+===================================================== */
+        foreach ($rows as $row) {
+            $laporan = $row->laporan;
+            $kategori = $row->kategori;
+            $nilai = (float) $row->total;
+
+            /* ======================
+        PENJUALAN → BON
+        Kredit + Hutang
+    ====================== */
+            if ($row->type === 'Pendapatan' && $row->transaksi_type === 'Kredit' && $row->status === 'Hutang') {
+                if (Str::startsWith($laporan, 'Penjualan ')) {
+                    $laporan = 'Bon ' . Str::after($laporan, 'Penjualan ');
+                }
+
+                if (Str::startsWith($kategori, 'Penjualan ')) {
+                    $kategori = 'Bon ' . Str::after($kategori, 'Penjualan ');
+                }
+
+                $this->bonData[$laporan]['detail'][$kategori] += $nilai;
+                $this->bonData[$laporan]['total'] += $nilai;
+            }
+
+            /* ======================
+        STOK LUNAS → ASET
+    ====================== */
+            if ($row->type === 'Aset' && $row->transaksi_type === 'Stok' && $row->status === 'Lunas') {
+                $this->stokData[$laporan]['detail'][$kategori] += $nilai;
+                $this->stokData[$laporan]['total'] += $nilai;
+            }
+
+            /* ======================
+        STOK HUTANG → HUTANG
+    ====================== */
+            if ($row->type === 'Aset' && $row->transaksi_type === 'Stok' && $row->status === 'Hutang') {
+                if (Str::startsWith($laporan, 'Stok ')) {
+                    $laporan = 'Hutang ' . Str::after($laporan, 'Stok ');
+                }
+
+                if (Str::startsWith($kategori, 'Stok ')) {
+                    $kategori = 'Hutang ' . Str::after($kategori, 'Stok ');
+                }
+
+                $this->hutangData[$laporan]['detail'][$kategori] += $nilai;
+                $this->hutangData[$laporan]['total'] += $nilai;
+            }
         }
     }
 
     public function with(): array
     {
-        $totalAset = array_sum(array_map(fn($d) => $d['total'], $this->pendapatanData) + array_map(fn($d) => $d['total'], $this->stokData));
-        $totalLiabilitas = array_sum(array_map(fn($d) => $d['total'], $this->pengeluaranData));
-        $totalModal = $totalAset - $totalLiabilitas;
+        $totalPendapatan = array_sum(array_column($this->bonData, 'total'));
+        $totalPengeluaran = array_sum(array_column($this->hutangData, 'total'));
 
         return [
-            'pendapatanData' => $this->pendapatanData,
-            'pengeluaranData' => $this->pengeluaranData,
-            'stokData' => $this->stokData,
-            'totalPendapatan' => $totalAset,
-            'totalPengeluaran' => $totalLiabilitas,
-            'totalModal' => $totalModal,
+            'bonData' => $this->bonData,
+            'hutangData' => $this->hutangData,
+            'totalPendapatan' => $totalPendapatan,
+            'totalPengeluaran' => $totalPengeluaran,
+            'totalModal' => $totalPendapatan - $totalPengeluaran,
         ];
     }
 };
-
 ?>
+
 <div class="p-6 space-y-6">
-    <x-header title="Laporan Aset per Jenis Barang" separator>
+    <x-header title="Laporan Aset" separator>
         <x-slot:actions>
             <x-button wire:click="export" icon="fas.download" primary>Export Excel</x-button>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-end">
@@ -264,7 +236,7 @@ new class extends Component {
             <div>
                 <h4 class="text-lg font-semibold text-green-700 mb-2"><i class="fas fa-arrow-up"></i>Aset</h4>
                 <ul class="divide-y divide-gray-200">
-                    @foreach ($pendapatanData as $kelompok => $data)
+                    @foreach ($bonData as $kelompok => $data)
                         <li class="py-2">
                             <div class="flex justify-between cursor-pointer"
                                 wire:click="$toggle('expanded.{{ $kelompok }}')">
@@ -311,7 +283,7 @@ new class extends Component {
             <div>
                 <h4 class="text-lg font-semibold text-red-700 mb-2"><i class="fas fa-arrow-down"></i>Liabilitas</h4>
                 <ul class="divide-y divide-gray-200">
-                    @foreach ($pengeluaranData as $kelompok => $data)
+                    @foreach ($hutangData as $kelompok => $data)
                         <li class="py-2">
                             <div class="flex justify-between cursor-pointer"
                                 wire:click="$toggle('expanded.{{ $kelompok }}')">

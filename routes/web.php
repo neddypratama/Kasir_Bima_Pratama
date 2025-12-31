@@ -63,6 +63,9 @@ Route::middleware('auth')->group(function () {
         Volt::route('/jenisbarangs', 'jenisbarangs.index');
         Volt::route('/clients', 'clients.index');
 
+        Volt::route('/kategori', 'kategori.index');
+        Volt::route('/detail', 'detail.index');
+
         Volt::route('/transaksis', 'transaksis.index');
         Volt::route('/transaksis/{transaksi}/show', 'transaksis.show');
 
@@ -86,6 +89,16 @@ Route::middleware('auth')->group(function () {
         Volt::route('/kasir/{transaksi}/edit', 'kasir.edit');
         Volt::route('/kasir/{transaksi}/show', 'kasir.show');
         Volt::route('/kasir/{transaksi}/print', 'kasir.print');
+    });
+
+    Route::middleware('role:1,2')->group(function () {
+        // Pakan
+        // Volt::route('/laporan-penjualan', 'pakan.index');
+        Volt::route('/keluar', 'keluar.index');
+        Volt::route('/keluar/create', 'keluar.create');
+        Volt::route('/keluar/{transaksi}/edit', 'keluar.edit');
+        Volt::route('/keluar/{transaksi}/show', 'keluar.show');
+        Volt::route('/keluar/{transaksi}/print', 'keluar.print');
 
         Volt::route('/supplier', 'supplier.index');
         Volt::route('/supplier/create', 'supplier.create');

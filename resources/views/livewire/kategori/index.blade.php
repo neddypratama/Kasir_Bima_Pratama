@@ -1,0 +1,240 @@
+<?php
+
+use App\Models\Kategori;
+use App\Models\Laporan;
+use Livewire\Volt\Component;
+use Mary\Traits\Toast;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\WithPagination;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Rule;
+
+new class extends Component {
+    use Toast;
+    use WithPagination;
+    public string $search = '';
+
+    public bool $drawer = false;
+
+    public array $sortBy = ['column' => 'id', 'direction' => 'asc'];
+
+    // Create a public property.
+    public int $laporan_id = 0;
+
+    public int $filter = 0;
+
+    public $page = [['id' => 25, 'name' => '25'], ['id' => 50, 'name' => '50'], ['id' => 100, 'name' => '100'], ['id' => 500, 'name' => '500']];
+
+    public int $perPage = 25; // Default jumlah data per halaman
+
+    public bool $editModal = false; // Untuk menampilkan modal
+
+    public ?Kategori $editingRole = null; // Menyimpan data role yang sedang diedit
+
+    public string $editingName = '';
+    public string $editingDeskripsi = ''; // Menyimpan nilai input untuk nama role
+    public int $editingDetailId = 0;
+
+    public bool $createModal = false; // Untuk menampilkan modal create
+
+    public string $newRoleName = '';
+    public string $newRoleDeskripsi = ''; // Untuk menyimpan input nama role baru
+    public int $newRoleDetailId = 0;
+
+    // Clear filters
+    public function clear(): void
+    {
+        $this->reset();
+        $this->resetPage();
+        $this->success('Filters cleared.', position: 'toast-top');
+    }
+
+    // Delete action
+    public function delete($id): void
+    {
+        $kategori = Kategori::findOrFail($id);
+        $kategori->delete();
+        $this->warning("Role $kategori->name akan dihapus", position: 'toast-top');
+    }
+
+    public function create(): void
+    {
+        $this->newRoleName = ''; // Reset input sebelum membuka modal
+        $this->newRoleDeskripsi = '';
+        $this->newRoleDetailId = 0;
+        $this->createModal = true;
+    }
+
+    public function saveCreate(): void
+    {
+        $this->validate([
+            'newRoleName' => 'required|string|max:255',
+            'newRoleDeskripsi' => 'nullable',
+            'newRoleDetailId' => 'required',
+        ]);
+
+        // dd( $this->newRoleDetailId);
+
+        Kategori::create(['name' => $this->newRoleName, 'deskripsi' => $this->newRoleDeskripsi, 'laporan_id' => $this->newRoleDetailId]);
+
+        $this->createModal = false;
+        $this->success('Kategori created successfully.', position: 'toast-top');
+    }
+
+    public function edit($id): void
+    {
+        $this->editingRole = Kategori::find($id);
+
+        if ($this->editingRole) {
+            $this->editingName = $this->editingRole->name;
+            $this->editingDeskripsi = $this->editingRole->deskripsi;
+            $this->editingDetailId = $this->editingRole->laporan_id ?? 0;
+            $this->editModal = true; // Tampilkan modal
+        }
+    }
+
+    public function saveEdit(): void
+    {
+        if ($this->editingRole) {
+            $this->validate([
+                'editingName' => 'required|string|max:255',
+                'editingDeskripsi' => 'nullable',
+                'editingDetailId' => 'required',
+            ]);
+            $this->editingRole->update(['name' => $this->editingName, 'deskripsi' => $this->editingDeskripsi, 'laporan_id' => $this->editingDetailId, 'updated_at' => now()]);
+            $this->editModal = false;
+            $this->success('Kategori updated successfully.', position: 'toast-top');
+        }
+    }
+
+    // Table headers
+    public function headers(): array
+    {
+        return [
+            ['key' => 'id', 'label' => '#'],
+            ['key' => 'laporan.name', 'label' => 'Nama Laporan', 'class' => 'w-64'], // Gunakan `users_count`
+            ['key' => 'name', 'label' => 'Name', 'class' => 'w-64'],
+            ['key' => 'deskripsi', 'label' => 'Deskripsi', 'class' => 'w-100'],
+        ];
+    }
+
+    public function roles(): LengthAwarePaginator
+    {
+        return Kategori::query()
+            ->with(['laporan:id,name']) // Menghitung jumlah users di setiap role
+            ->when($this->search, fn(Builder $q) => $q->where('name', 'like', "%$this->search%"))
+            ->when($this->laporan_id, fn(Builder $q) => $q->where('laporan_id', $this->laporan_id))
+            ->orderBy(...array_values($this->sortBy))
+            ->paginate($this->perPage);
+    }
+
+    public function with(): array
+    {
+        if ($this->filter >= 0 && $this->filter < 2) {
+            if (!empty($this->search)) {
+                $this->filter++;
+            }
+            if ($this->laporan_id != 0) {
+                $this->filter++;
+            }
+        }
+        return [
+            'roles' => $this->roles(),
+            'laporan' => Laporan::all(),
+            'headers' => $this->headers(),
+            'perPage' => $this->perPage,
+            'pages' => $this->page,
+        ];
+    }
+
+    // Reset pagination when any component property changes
+    public function updated($property): void
+    {
+        if (!is_array($property) && $property != '') {
+            $this->resetPage();
+        }
+    }
+};
+
+?>
+
+<div>
+    <!-- HEADER -->
+    <x-header title="Daftar Kategori" separator progress-indicator>
+        <x-slot:actions>
+            <x-button label="Create" @click="$wire.create()" responsive icon="o-plus" class="btn-primary" />
+        </x-slot:actions>
+    </x-header>
+
+    <!-- FILTERS -->
+    <div class="grid grid-cols-1 md:grid-cols-8 gap-4  items-end mb-4">
+        <div class="md:col-span-1">
+            <x-select label="Show entries" :options="$pages" wire:model.live="perPage" class="w-15" />
+        </div>
+        <div class="md:col-span-6">
+            <x-input placeholder="Search..." wire:model.live.debounce="search" clearable icon="o-magnifying-glass"
+                class="" />
+        </div>
+        <div class="md:col-span-1">
+            <x-button label="Filters" @click="$wire.drawer = true" responsive icon="o-funnel"
+                badge="{{ $this->filter }}" badge-classes="badge-primary" />
+        </div>
+        <!-- Dropdown untuk jumlah data per halaman -->
+    </div>
+
+    <!-- TABLE wire:poll.5s="users"  -->
+    <x-card>
+        <x-table :headers="$headers" :rows="$roles" :sort-by="$sortBy" with-pagination
+            @row-click="$wire.edit($event.detail.id)">
+            @scope('actions', $roles)
+                <x-button icon="o-trash" wire:click="delete({{ $roles['id'] }})"
+                    wire:confirm="Yakin ingin menghapus {{ $roles['name'] }}?" spinner
+                    class="btn-ghost btn-sm text-red-500" />
+            @endscope
+        </x-table>
+    </x-card>
+
+    <x-drawer wire:model="drawer" title="Filters" right separator with-close-button
+        class="w-full sm:w-[90%] md:w-1/2 lg:w-1/3">
+        <div class="grid gap-5">
+            <x-input placeholder="Cari Invoice..." wire:model.live.debounce="search" clearable
+                icon="o-magnifying-glass" />
+
+            <x-choices-offline placeholder="Pilih Laporan" wire:model.live="laporan_id" :options="$laporan" icon="o-flag"
+                single searchable />
+        </div>
+
+        <x-slot:actions>
+            <x-button label="Reset" icon="o-x-mark" wire:click="clear" spinner />
+            <x-button label="Done" icon="o-check" class="btn-primary" @click="$wire.drawer=false" />
+        </x-slot:actions>
+    </x-drawer>
+
+    <x-modal wire:model="createModal" title="Create Kategori">
+        <div class="grid gap-4">
+            <x-input label="Kategori Name" wire:model.live="newRoleName" />
+            <x-textarea label="Kategori Deskripsi" wire:model.live="newRoleDeskripsi" placeholder="Here ..." />
+            <x-choices-offline placeholder="Pilih Laporan" wire:model.live="newRoleDetailId" :options="$laporan" icon="o-flag" label="Laporan"
+                single searchable />
+        </div>
+
+        <x-slot:actions>
+            <x-button label="Cancel" icon="o-x-mark" @click="$wire.createModal=false" />
+            <x-button label="Create" icon="o-check" class="btn-primary" wire:click="saveCreate" />
+        </x-slot:actions>
+    </x-modal>
+
+    <x-modal wire:model="editModal" title="Edit Kategori">
+        <div class="grid gap-4">
+            <x-input label="Kategori Name" wire:model.live="editingName" />
+            <x-textarea label="Kategori Deskripsi" wire:model.live="editingDeskripsi" placeholder="Here ..." />
+            <x-choices-offline placeholder="Pilih Laporan" wire:model.live="editingDetailId" :options="$laporan" icon="o-flag" label="Laporan"
+                single searchable />
+        </div>
+
+        <x-slot:actions>
+            <x-button label="Cancel" icon="o-x-mark" @click="$wire.editModal=false" />
+            <x-button label="Save" icon="o-check" class="btn-primary" wire:click="saveEdit" />
+        </x-slot:actions>
+    </x-modal>
+</div>

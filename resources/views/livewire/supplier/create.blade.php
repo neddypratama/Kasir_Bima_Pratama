@@ -1,7 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\KonversiSatuan;
+use App\Models\Kategori;
 use App\Models\Transaksi;
 use App\Models\DetailTransaksi;
 use App\Models\Barang;
@@ -124,10 +124,12 @@ new class extends Component {
 
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
+            $kategori = Kategori::where('name', 'like', 'Stok %' . $barang->jenis->name)->first();
 
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
+                'kategori_id' => $kategori->id,
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],

@@ -1,7 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\{Barang, Client, Transaksi, DetailTransaksi, KonversiSatuan};
+use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori};
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
@@ -129,10 +129,12 @@ new class extends Component {
         ====================== */
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
+            $kategori = Kategori::where('name', 'like', 'Stok %' . $barang->jenis->name)->first();
 
             DetailTransaksi::create([
                 'transaksi_id' => $this->transaksi->id,
                 'barang_id' => $barang->id,
+                'kategori_id' => $kategori->id,
                 'value' => $item['value'],
                 'kuantitas' => $item['kuantitas'],
                 'sub_total' => $item['value'] * $item['kuantitas'],
