@@ -17,6 +17,9 @@ new class extends Component {
     public string $invoice = '';
 
     #[Rule('required')]
+    public ?string $name = '';
+
+    #[Rule('required')]
     public ?int $user_id = null;
 
     public float $total = 0;
@@ -66,6 +69,7 @@ new class extends Component {
 
         $kasir = Transaksi::create([
             'invoice' => $this->invoice,
+            'name' => $this->name,
             'user_id' => $this->user_id,
             'tanggal' => $this->tanggal,
             'client_id' => null,
@@ -75,7 +79,7 @@ new class extends Component {
             'uang' => null,
             'kembalian' => null,
         ]);
-        
+
         DetailTransaksi::create([
             'transaksi_id' => $kasir->id,
             'barang_id' => null,
@@ -102,14 +106,18 @@ new class extends Component {
                     <x-header title="Basic Info" subtitle="Informasi transaksi" size="text-2xl" />
                 </div>
                 <div class="col-span-5 space-y-3">
-
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-input label="Invoice" wire:model="invoice" readonly />
                         <x-datetime label="Date + Time" wire:model="tanggal" type="datetime-local" readonly />
                         <x-choices-offline label="Kategori" wire:model="kategori_id" :options="$kategori" option-value="id"
                             option-label="name" placeholder="Pilih Kategori" single searchable />
                     </div>
-                    <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="col-span-2">
+                            <x-input label="Deskripsi Pengeluaran" wire:model="name" />
+                        </div>
+                        <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                    </div>
                 </div>
             </div>
         </x-card>

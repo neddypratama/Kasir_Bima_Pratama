@@ -15,6 +15,9 @@ new class extends Component {
     public ?string $invoice = null;
 
     #[Rule('required')]
+    public ?string $name = null;
+
+    #[Rule('required')]
     public ?string $tanggal = null;
 
     #[Rule('required')]
@@ -40,6 +43,7 @@ new class extends Component {
     {
         $this->transaksi = $transaksi->load('details');
         $this->invoice = $transaksi->invoice;
+        $this->name = $transaksi->name;
         $this->tanggal = $transaksi->tanggal;
         $this->total = $transaksi->total;
         $this->kategori_id = $transaksi->details->first()->kategori_id;
@@ -56,6 +60,7 @@ new class extends Component {
         DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
 
         $this->transaksi->update([
+            'name' => $this->name,
             'total' => $this->total,
         ]);
 
@@ -85,14 +90,18 @@ new class extends Component {
                     <x-header title="Basic Info" subtitle="Informasi transaksi" size="text-2xl" />
                 </div>
                 <div class="col-span-5 space-y-3">
-
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-input label="Invoice" wire:model="invoice" readonly />
                         <x-datetime label="Date + Time" wire:model="tanggal" type="datetime-local" readonly />
                         <x-choices-offline label="Kategori" wire:model="kategori_id" :options="$kategori" option-value="id"
                             option-label="name" placeholder="Pilih Kategori" single searchable />
                     </div>
-                    <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div class="col-span-2">
+                            <x-input label="Deskripsi Pengeluaran" wire:model="name" />
+                        </div>
+                        <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                    </div>
                 </div>
             </div>
         </x-card>

@@ -18,6 +18,8 @@
         ====================== */
         public function mount()
         {
+            $this->startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $this->endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
             $this->generateReport();
         }
     
@@ -79,7 +81,6 @@
                 ->whereBetween('t.tanggal', [$start, $end])
                 ->groupBy('l.name', 'l.type', 'k.name')
                 ->get();
-    
     
             /* ======================
                 4. ISI NILAI
