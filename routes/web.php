@@ -91,6 +91,15 @@ Route::middleware('auth')->group(function () {
         Volt::route('/kasir/{transaksi}/print', 'kasir.print');
     });
 
+    Route::middleware('role:1,4')->group(function () {
+        // Pakan
+        // Volt::route('/laporan-penjualan', 'pakan.index');
+        Volt::route('/bon-kandang', 'bon-kandang.index');
+        Volt::route('/bon-kandang/create', 'bon-kandang.create');
+        Volt::route('/bon-kandang/{transaksi}/edit', 'bon-kandang.edit');
+        Volt::route('/bon-kandang/{transaksi}/show', 'bon-kandang.show');
+    });
+
     Route::middleware('role:1,2')->group(function () {
         // Pakan
         // Volt::route('/laporan-penjualan', 'pakan.index');

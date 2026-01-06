@@ -1,7 +1,11 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori};
+use App\Models\Transaksi;
+use App\Models\Kategori;
+use App\Models\DetailTransaksi;
+use App\Models\Barang;
+use App\Models\Client;
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
@@ -9,26 +13,26 @@ use Illuminate\Support\Str;
 new class extends Component {
     use Toast;
 
-    public Transaksi $transaksi;
-    public Transaksi $hpp;
+    #[Rule('required|unique:transaksis,invoice')]
+    public string $invoice = '';
+    public string $invoice2 = '';
 
     #[Rule('required')]
-    public ?string $invoice = null;
-
-    #[Rule('required')]
-    public ?string $tanggal = null;
+    public ?int $user_id = null;
 
     #[Rule('required')]
     public ?int $client_id = null;
 
-    #[Rule('required')]
     public float $total = 0;
 
-    #[Rule('required')]
     public ?float $uang = 0;
 
     #[Rule('required')]
+    public ?string $tanggal = null;
+
+    #[Rule('required|array|min:1')]
     public array $details = [];
+
     public $barangs;
 
     /* =====================
@@ -38,7 +42,7 @@ new class extends Component {
     {
         return [
             'barangs' => $this->barangs,
-            'clients' => Client::where('keterangan', 'like', '%Pembeli%')->get(),
+            'clients' => Client::where('name', 'like', '%Kandang Kambing%')->get(),
             'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
         ];
     }
@@ -46,45 +50,27 @@ new class extends Component {
     /* =====================
         MOUNT
     ====================== */
-    public function mount(Transaksi $transaksi): void
+    public function mount(): void
     {
-        $this->transaksi = $transaksi->load('details.barang');
-        $this->invoice = $transaksi->invoice;
-        $this->tanggal = $transaksi->tanggal;
-        $this->client_id = $transaksi->client_id;
-        $this->uang = $transaksi->uang;
+        $this->user_id = auth()->id();
+        $this->tanggal = now()->format('Y-m-d\TH:i');
+        $this->updatedTanggal($this->tanggal);
+
         $this->barangs = Barang::all();
 
-        // cari transaksi HPP pasangan
-        $inv = substr($transaksi->invoice, -4);
-        $tanggal = explode('-', $transaksi->invoice)[1];
+        $quest = Client::where('name', 'like', '%Quest%')->first();
+        $this->client_id = $quest?->id;
 
-        $this->hpp = Transaksi::where('invoice', 'like', "%-$tanggal-HPP-$inv")->firstOrFail();
+        $this->addDetail();
+    }
 
-        foreach ($transaksi->details as $detail) {
-            $barang = $detail->barang;
-            $satuan = '';
+    public function updatedTanggal($value): void
+    {
+        $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
+        $rand = Str::upper(Str::random(4));
 
-            if ($barang->harga_eceran == $detail->value) {
-                $satuan = 'Eceran';
-            } else {
-                $satuan = 'partai';
-            }
-
-            // 🔥 stok awal = stok sekarang + qty lama × konversi lama
-            $stokAwal = $barang->stok + $detail->kuantitas;
-
-            $this->details[] = [
-                'barang_id' => $barang->id,
-                'satuan' => $satuan,
-                'value' => $detail->value,
-                'kuantitas' => $detail->kuantitas,
-                'stok_awal' => $stokAwal,
-                'max_qty' => floor($stokAwal),
-            ];
-        }
-
-        $this->calculateTotal();
+        $this->invoice = "INV-$tanggal-DPT-$rand";
+        $this->invoice2 = "INV-$tanggal-HPP-$rand";
     }
 
     /* =====================
@@ -94,12 +80,15 @@ new class extends Component {
     {
         $index = explode('.', $key)[0];
 
-        // pilih barang
+        /*
+    |--------------------------------------------------------------------------
+    | PILIH BARANG
+    |--------------------------------------------------------------------------
+    */
         if (str_ends_with($key, '.barang_id')) {
             $barang = Barang::find($value);
 
             if ($barang) {
-                $this->details[$index]['stok_awal'] = $barang->stok;
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
 
@@ -123,10 +112,15 @@ new class extends Component {
             }
         }
 
-        // qty
+        /*
+    |--------------------------------------------------------------------------
+    | QTY
+    |--------------------------------------------------------------------------
+    */
         if (str_ends_with($key, '.kuantitas')) {
             $qty = max(1, (int) $value);
             $max = $this->details[$index]['max_qty'] ?? $qty;
+
             $this->details[$index]['kuantitas'] = min($qty, $max);
         }
 
@@ -139,50 +133,38 @@ new class extends Component {
     }
 
     /* =====================
-        SAVE UPDATE
+        SAVE
     ====================== */
     public function save(): void
     {
         $this->validate([
             'client_id' => 'required',
-            'details.*.barang_id' => 'required',
+            'details' => 'required|array|min:1',
+            'details.*.barang_id' => 'required|exists:barangs,id',
             'details.*.satuan' => 'required',
-            'details.*.kuantitas' => 'required|min:1',
+            'details.*.kuantitas' => 'required|numeric|min:1',
         ]);
 
-        $client = Client::find($this->client_id);
-        $status = $client->name == 'Quest' && $this->uang >= $this->total ? 'Lunas' : 'Hutang';
-
-        /* =====================
-            ROLLBACK STOK LAMA
-        ====================== */
-        foreach ($this->transaksi->details as $detail) {
-            $detail->barang->increment('stok', $detail->kuantitas);
-        }
-
-        // hapus detail lama
-        DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
-        DetailTransaksi::where('transaksi_id', $this->hpp->id)->delete();
-
-        $this->transaksi->update([
+        $kasir = Transaksi::create([
+            'invoice' => $this->invoice,
+            'user_id' => $this->user_id,
+            'tanggal' => $this->tanggal,
             'client_id' => $this->client_id,
+            'type' => 'Kredit',
             'total' => $this->total,
-            'uang' => $this->uang,
-            'status' => $status,
+            'status' => 'Hutang',
+            'uang' => 0,
             'kembalian' => max(0, $this->uang - $this->total),
         ]);
 
         $totalHPP = 0;
 
-        /* =====================
-            SIMPAN DETAIL BARU
-        ====================== */
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
             $kategori = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
-
+            
             DetailTransaksi::create([
-                'transaksi_id' => $this->transaksi->id,
+                'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
                 'kategori_id' => $kategori->id,
                 'value' => $item['value'],
@@ -190,18 +172,26 @@ new class extends Component {
                 'sub_total' => $item['value'] * $item['kuantitas'],
             ]);
 
-            $barang->decrement('stok', $item['kuantitas']);
             $totalHPP += $barang->hpp * $item['kuantitas'];
+            $barang->decrement('stok', $item['kuantitas']);
         }
 
-        $this->hpp->update(['total' => $totalHPP]);
+        $hpp = Transaksi::create([
+            'invoice' => $this->invoice2,
+            'user_id' => $this->user_id,
+            'tanggal' => $this->tanggal,
+            'client_id' => $this->client_id,
+            'type' => 'Debit',
+            'total' => $totalHPP,
+            'status' => 'Hutang',
+        ]);
 
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
             $kategori = Kategori::where('name', 'like', 'HPP %' . $barang->jenis->name)->first();
 
             DetailTransaksi::create([
-                'transaksi_id' => $this->hpp->id,
+                'transaksi_id' => $hpp->id,
                 'barang_id' => $barang->id,
                 'kategori_id' => $kategori->id,
                 'value' => $barang->hpp,
@@ -210,13 +200,31 @@ new class extends Component {
             ]);
         }
 
-        $this->success('Transaksi berhasil diperbarui', redirectTo: '/kasir');
+        $this->success('Transaksi berhasil dibuat!', redirectTo: '/bon-kandang');
+    }
+
+    public function addDetail(): void
+    {
+        $this->details[] = [
+            'barang_id' => null,
+            'satuan' => null,
+            'value' => 0,
+            'kuantitas' => 1,
+            'max_qty' => null,
+        ];
+    }
+
+    public function removeDetail(int $index): void
+    {
+        unset($this->details[$index]);
+        $this->details = array_values($this->details);
+        $this->calculateTotal();
     }
 };
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Update {{ $transaksi->invoice }}" separator progress-indicator />
+    <x-header title="Tambah Transaksi Piutang Kanfang" separator progress-indicator />
 
     <x-form wire:submit="save">
 
@@ -286,18 +294,11 @@ new class extends Component {
                     @endforeach
 
                     <x-button icon="o-plus" class="btn-primary" wire:click="addDetail" label="Tambah Item" />
-
+                    
                     <!-- TOTAL, UANG, KEMBALIAN -->
                     <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
-
-                        <x-input label="Uang Diterima" wire:model.live="uang" prefix="Rp " money
-                            class="font-bold text-lg" />
-
-                        <x-input label="Kembalian" value="Rp {{ number_format(max(0, $uang - $total), 0, '.', ',') }}"
-                            readonly class="font-bold text-lg" />
                     </div>
 
                 </div>
@@ -305,7 +306,7 @@ new class extends Component {
         </x-card>
 
         <x-slot:actions>
-            <x-button label="Cancel" link="/kasir" />
+            <x-button label="Cancel" link="/bon-kandang" />
             <x-button label="Save" class="btn-primary" type="submit" spinner="save" />
         </x-slot:actions>
 

@@ -25,9 +25,6 @@ new class extends Component {
     public float $total = 0;
 
     #[Rule('required')]
-    public ?float $uang = 0;
-
-    #[Rule('required')]
     public array $details = [];
     public $barangs;
 
@@ -38,7 +35,7 @@ new class extends Component {
     {
         return [
             'barangs' => $this->barangs,
-            'clients' => Client::where('keterangan', 'like', '%Pembeli%')->get(),
+            'clients' => Client::where('name', 'like', '%Kandang Kambing%')->get(),
             'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
         ];
     }
@@ -52,7 +49,6 @@ new class extends Component {
         $this->invoice = $transaksi->invoice;
         $this->tanggal = $transaksi->tanggal;
         $this->client_id = $transaksi->client_id;
-        $this->uang = $transaksi->uang;
         $this->barangs = Barang::all();
 
         // cari transaksi HPP pasangan
@@ -68,7 +64,7 @@ new class extends Component {
             if ($barang->harga_eceran == $detail->value) {
                 $satuan = 'Eceran';
             } else {
-                $satuan = 'partai';
+                $satuan = 'Partai';
             }
 
             // 🔥 stok awal = stok sekarang + qty lama × konversi lama
@@ -150,9 +146,6 @@ new class extends Component {
             'details.*.kuantitas' => 'required|min:1',
         ]);
 
-        $client = Client::find($this->client_id);
-        $status = $client->name == 'Quest' && $this->uang >= $this->total ? 'Lunas' : 'Hutang';
-
         /* =====================
             ROLLBACK STOK LAMA
         ====================== */
@@ -167,9 +160,8 @@ new class extends Component {
         $this->transaksi->update([
             'client_id' => $this->client_id,
             'total' => $this->total,
-            'uang' => $this->uang,
-            'status' => $status,
-            'kembalian' => max(0, $this->uang - $this->total),
+            'status' => 'Hutang',
+            'kembalian' => 0,
         ]);
 
         $totalHPP = 0;
@@ -210,7 +202,7 @@ new class extends Component {
             ]);
         }
 
-        $this->success('Transaksi berhasil diperbarui', redirectTo: '/kasir');
+        $this->success('Transaksi berhasil diperbarui', redirectTo: '/bon-kandang');
     }
 };
 ?>
@@ -292,12 +284,6 @@ new class extends Component {
 
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
-
-                        <x-input label="Uang Diterima" wire:model.live="uang" prefix="Rp " money
-                            class="font-bold text-lg" />
-
-                        <x-input label="Kembalian" value="Rp {{ number_format(max(0, $uang - $total), 0, '.', ',') }}"
-                            readonly class="font-bold text-lg" />
                     </div>
 
                 </div>
@@ -305,7 +291,7 @@ new class extends Component {
         </x-card>
 
         <x-slot:actions>
-            <x-button label="Cancel" link="/kasir" />
+            <x-button label="Cancel" link="/bon-kandang" />
             <x-button label="Save" class="btn-primary" type="submit" spinner="save" />
         </x-slot:actions>
 

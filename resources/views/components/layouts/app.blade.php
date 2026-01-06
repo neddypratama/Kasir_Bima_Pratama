@@ -103,9 +103,13 @@
                 @endif
 
                 <x-menu-sub title="Manage Transaksi" icon="fas.basket-shopping">
+                    @if (in_array(auth()->user()->role_id, [1, 4]))
+                        <x-menu-item title="Bon Kandang" icon="fas.house" link="/bon-kandang" />
+                    @endif
                     @if (in_array(auth()->user()->role_id, [1, 3]))
-                        {{-- <x-menu-item title="Laporan Penjualan" icon="fas.store" link="/laporan-penjualan" /> --}}
                         <x-menu-item title="Penjualan" icon="fas.cart-plus" link="/kasir" />
+                    @endif
+                    @if (in_array(auth()->user()->role_id, [1, 2]))
                         <x-menu-item title="Pembelian" icon="fas.sack-dollar" link="/supplier" />
                         <x-menu-item title="Pengeluaran" icon="fas.circle-dollar-to-slot" link="/keluar" />
                     @endif
