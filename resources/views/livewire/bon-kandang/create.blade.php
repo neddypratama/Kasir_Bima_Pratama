@@ -118,7 +118,7 @@ new class extends Component {
     |--------------------------------------------------------------------------
     */
         if (str_ends_with($key, '.kuantitas')) {
-            $qty = max(1, (int) $value);
+            $qty = max(0.01, (float) str_replace(',', '.', $value));
             $max = $this->details[$index]['max_qty'] ?? $qty;
 
             $this->details[$index]['kuantitas'] = min($qty, $max);
@@ -162,7 +162,7 @@ new class extends Component {
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
             $kategori = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
-            
+
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
@@ -294,7 +294,7 @@ new class extends Component {
                     @endforeach
 
                     <x-button icon="o-plus" class="btn-primary" wire:click="addDetail" label="Tambah Item" />
-                    
+
                     <!-- TOTAL, UANG, KEMBALIAN -->
                     <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly

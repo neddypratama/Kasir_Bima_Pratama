@@ -125,8 +125,9 @@ new class extends Component {
 
         // qty
         if (str_ends_with($key, '.kuantitas')) {
-            $qty = max(1, (int) $value);
+            $qty = max(0.01, (float) str_replace(',', '.', $value));
             $max = $this->details[$index]['max_qty'] ?? $qty;
+
             $this->details[$index]['kuantitas'] = min($qty, $max);
         }
 

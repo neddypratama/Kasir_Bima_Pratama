@@ -118,7 +118,7 @@ new class extends Component {
     |--------------------------------------------------------------------------
     */
         if (str_ends_with($key, '.kuantitas')) {
-            $qty = max(1, (int) $value);
+            $qty = max(0.01, (float) str_replace(',', '.', $value));
             $max = $this->details[$index]['max_qty'] ?? $qty;
 
             $this->details[$index]['kuantitas'] = min($qty, $max);
@@ -165,7 +165,7 @@ new class extends Component {
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
             $kategori = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
-            
+
             DetailTransaksi::create([
                 'transaksi_id' => $kasir->id,
                 'barang_id' => $barang->id,
