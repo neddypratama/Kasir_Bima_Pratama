@@ -86,7 +86,7 @@ new class extends Component {
         <div class="p-7 mt-4 rounded-lg shadow-md">
 
             <div class="">
-                <p class="mb-1">Grand Total</p>
+                <p class="mb-1">Grand Total ({{$transaksi->bayar}})</p>
                 <p class="font-semibold text-end text-xl">
                     Rp {{ number_format($transaksi->total, 0, ',', '.') }}
                 </p>
@@ -172,7 +172,7 @@ new class extends Component {
         <div class="p-7 mt-4 rounded-lg shadow-md">
 
             <div class="">
-                <p class="mb-1">Grand Total</p>
+                <p class="mb-1">Grand Total ({{$transaksi->bayar}})</p>
                 <p class="font-semibold text-end text-xl">
                     Rp {{ number_format($hpp->total, 0, ',', '.') }}
                 </p>

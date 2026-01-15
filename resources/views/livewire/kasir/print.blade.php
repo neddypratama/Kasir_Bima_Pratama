@@ -159,6 +159,10 @@ new #[Layout('components.layouts.empty')] #[Title('Print Struk')] class extends 
         <div class="line"></div>
 
         <!-- TOTAL -->
+         <div class="total-row">
+            <span>METODE</span>
+            <span>{{ $transaksi->bayar }}</span>
+        </div>
         <div class="total-row">
             <span>TOTAL</span>
             <span>{{ number_format($transaksi->total, 0, ',', '.') }}</span>

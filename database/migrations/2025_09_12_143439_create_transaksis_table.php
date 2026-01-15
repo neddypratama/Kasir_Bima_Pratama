@@ -22,6 +22,7 @@ return new class extends Migration
             $table->decimal('uang', 15, 2)->nullable();
             $table->decimal('kembalian', 15, 2)->nullable();
             $table->enum('status', ['Lunas', 'Hutang']);
+            $table->enum('bayar', ['Cash', 'Transfer']);
             $table->timestamps();
         });
     }

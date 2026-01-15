@@ -226,10 +226,10 @@ new class extends Component {
                             link="/keluar/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
                             class="btn-ghost btn-sm text-yellow-500" tooltip="Edit" />
                     @endif
-                    <x-button icon="o-pencil-square" wire:click="openStatusModal({{ $transaksi->id }})"
+                    {{-- <x-button icon="o-pencil-square" wire:click="openStatusModal({{ $transaksi->id }})"
                         class="btn-ghost btn-sm text-purple-500" tooltip="Update Status" />
                     <x-button icon="o-printer" link="/keluar/{{ $transaksi->id }}/print"
-                        class="btn-ghost btn-sm text-blue-500" tooltip="Print Struk" />
+                        class="btn-ghost btn-sm text-blue-500" tooltip="Print Struk" /> --}}
                 </div>
             @endscope
         </x-table>

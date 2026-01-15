@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Transaksi extends Model
 {
     protected $table = 'transaksis';
-    protected $fillable = ['invoice', 'name', 'tanggal', 'status', 'type', 'total', 'user_id', 'client_id', 'uang', 'kembalian'];
+    protected $fillable = ['invoice', 'name', 'tanggal', 'status', 'bayar', 'type', 'total', 'user_id', 'client_id', 'uang', 'kembalian'];
 
     public function user()
     {

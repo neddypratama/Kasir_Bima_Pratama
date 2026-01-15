@@ -26,6 +26,9 @@ new class extends Component {
     #[Rule('required')]
     public float $total = 0;
 
+    #[Rule('required')]
+    public ?string $bayar = null;
+
     /* =====================
         WITH
     ====================== */
@@ -33,6 +36,7 @@ new class extends Component {
     {
         return [
             'kategori' => Kategori::where('name', 'like', 'Beban%')->get(),
+            'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
 
@@ -46,6 +50,7 @@ new class extends Component {
         $this->name = $transaksi->name;
         $this->tanggal = $transaksi->tanggal;
         $this->total = $transaksi->total;
+        $this->bayar = $transaksi->bayar;
         $this->kategori_id = $transaksi->details->first()->kategori_id;
     }
 
@@ -62,6 +67,7 @@ new class extends Component {
         $this->transaksi->update([
             'name' => $this->name,
             'total' => $this->total,
+            'bayar' => $this->bayar,
         ]);
 
         DetailTransaksi::create([
@@ -86,20 +92,23 @@ new class extends Component {
         <!-- BASIC INFO -->
         <x-card>
             <div class="lg:grid grid-cols-8 gap-4">
-                <div class="col-span-3">
+                <div class="col-span-2">
                     <x-header title="Basic Info" subtitle="Informasi transaksi" size="text-2xl" />
                 </div>
-                <div class="col-span-5 space-y-3">
+                <div class="col-span-6 space-y-3">
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-input label="Invoice" wire:model="invoice" readonly />
                         <x-datetime label="Date + Time" wire:model="tanggal" type="datetime-local" readonly />
                         <x-choices-offline label="Kategori" wire:model="kategori_id" :options="$kategori" option-value="id"
                             option-label="name" placeholder="Pilih Kategori" single searchable />
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <div class="col-span-2">
-                            <x-input label="Deskripsi Pengeluaran" wire:model="name" />
+                            <x-input label="Deskripsi Pengeluaran" wire:model="name"
+                                placeholder="Contoh: Bayar Karyawan" />
                         </div>
+                        <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
+                            placeholder="Pilih Metode" />
                         <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
                     </div>
                 </div>

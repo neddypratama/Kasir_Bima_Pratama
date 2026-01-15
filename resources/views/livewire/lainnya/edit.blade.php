@@ -1,11 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\Transaksi;
-use App\Models\Kategori;
-use App\Models\DetailTransaksi;
-use App\Models\Barang;
-use App\Models\Client;
+use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori};
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
@@ -13,33 +9,33 @@ use Illuminate\Support\Str;
 new class extends Component {
     use Toast;
 
-    #[Rule('required|unique:transaksis,invoice')]
-    public string $invoice = '';
+    public Transaksi $transaksi;
 
     #[Rule('required')]
-    public ?string $name = '';
+    public ?string $invoice = null;
 
     #[Rule('required')]
-    public ?int $user_id = null;
-
-    public float $total = 0;
+    public ?string $name = null;
 
     #[Rule('required')]
     public ?string $tanggal = null;
 
     #[Rule('required')]
-    public ?int $kategori_id = 0;
+    public ?int $kategori_id = null;
 
-    #[Rule('nullable|array|min:0')]
-    public array $details = [];
+    #[Rule('required')]
+    public float $total = 0;
 
     #[Rule('required')]
     public ?string $bayar = null;
 
+    /* =====================
+        WITH
+    ====================== */
     public function with(): array
     {
         return [
-            'kategori' => Kategori::where('name', 'like', 'Beban%')->get(),
+            'kategori' => Kategori::where('name', 'like', 'Pendapatan Lainnya%')->get(),
             'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
@@ -47,46 +43,35 @@ new class extends Component {
     /* =====================
         MOUNT
     ====================== */
-    public function mount(): void
+    public function mount(Transaksi $transaksi): void
     {
-        $this->user_id = auth()->id();
-        $this->tanggal = now()->format('Y-m-d\TH:i');
-        $this->updatedTanggal($this->tanggal);
-    }
-
-    public function updatedTanggal($value): void
-    {
-        $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
-        $rand = Str::upper(Str::random(4));
-
-        $this->invoice = "INV-$tanggal-BBN-$rand";
+        $this->transaksi = $transaksi->load('details');
+        $this->invoice = $transaksi->invoice;
+        $this->name = $transaksi->name;
+        $this->tanggal = $transaksi->tanggal;
+        $this->total = $transaksi->total;
+        $this->bayar = $transaksi->bayar;
+        $this->kategori_id = $transaksi->details->first()->kategori_id;
     }
 
     /* =====================
-        SAVE
+        SAVE UPDATE
     ====================== */
     public function save(): void
     {
-        $this->validate([
-            'details' => 'nullable|array|min:0',
-        ]);
+        $this->validate();
 
-        $kasir = Transaksi::create([
-            'invoice' => $this->invoice,
+        // hapus detail lama
+        DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
+
+        $this->transaksi->update([
             'name' => $this->name,
-            'user_id' => $this->user_id,
-            'tanggal' => $this->tanggal,
-            'client_id' => null,
-            'type' => 'Debit',
             'total' => $this->total,
             'bayar' => $this->bayar,
-            'status' => 'Lunas',
-            'uang' => null,
-            'kembalian' => null,
         ]);
 
         DetailTransaksi::create([
-            'transaksi_id' => $kasir->id,
+            'transaksi_id' => $this->transaksi->id,
             'barang_id' => null,
             'kategori_id' => $this->kategori_id,
             'value' => $this->total,
@@ -94,13 +79,13 @@ new class extends Component {
             'sub_total' => $this->total,
         ]);
 
-        $this->success('Transaksi berhasil dibuat!', redirectTo: '/keluar');
+        $this->success('Transaksi berhasil diperbarui', redirectTo: '/lainnya');
     }
 };
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Tambah Transaksi Pengeluaran" separator progress-indicator />
+    <x-header title="Update {{ $transaksi->invoice }}" separator progress-indicator />
 
     <x-form wire:submit="save">
 
@@ -119,19 +104,19 @@ new class extends Component {
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <div class="col-span-2">
-                            <x-input label="Deskripsi Pengeluaran" wire:model="name"
-                                placeholder="Contoh: Bayar Karyawan" />
+                            <x-input label="Deskripsi Pendapatan" wire:model="name"
+                                placeholder="Contoh: Upah kirim jagung" />
                         </div>
                         <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
                             placeholder="Pilih Metode" />
-                        <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                        <x-input label="Total Pendapatan" wire:model.live="total" prefix="Rp " money="IDR" />
                     </div>
                 </div>
             </div>
         </x-card>
 
         <x-slot:actions>
-            <x-button label="Cancel" link="/keluar" />
+            <x-button label="Cancel" link="/lainnya" />
             <x-button label="Save" class="btn-primary" type="submit" spinner="save" />
         </x-slot:actions>
 

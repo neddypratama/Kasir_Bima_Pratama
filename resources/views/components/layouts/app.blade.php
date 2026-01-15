@@ -112,6 +112,7 @@
                     @if (in_array(auth()->user()->role_id, [1, 2]))
                         <x-menu-item title="Pembelian" icon="fas.sack-dollar" link="/supplier" />
                         <x-menu-item title="Pengeluaran" icon="fas.circle-dollar-to-slot" link="/keluar" />
+                        <x-menu-item title="Pendapatan Lain" icon="fas.circle-dollar-to-slot" link="/lainnya" />
                     @endif
                 </x-menu-sub>
 

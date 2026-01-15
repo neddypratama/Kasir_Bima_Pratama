@@ -114,6 +114,11 @@ Route::middleware('auth')->group(function () {
         Volt::route('/supplier/{transaksi}/edit', 'supplier.edit');
         Volt::route('/supplier/{transaksi}/show', 'supplier.show');
         Volt::route('/supplier/{transaksi}/print', 'supplier.print');
+
+        Volt::route('/lainnya', 'lainnya.index');
+        Volt::route('/lainnya/create', 'lainnya.create');
+        Volt::route('/lainnya/{transaksi}/edit', 'lainnya.edit');
+        Volt::route('/lainnya/{transaksi}/show', 'lainnya.show');
     });
 
     /*

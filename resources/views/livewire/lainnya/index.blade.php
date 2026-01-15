@@ -30,8 +30,6 @@ new class extends Component {
     public bool $drawer = false;
     public array $sortBy = ['column' => 'id', 'direction' => 'desc'];
     public int $filter = 0;
-    public int $client_id = 0;
-    public int $barang_id = 0;
 
     public bool $exportModal = false; // ✅ Modal export
     // ✅ Tambah tanggal untuk filter export
@@ -54,7 +52,6 @@ new class extends Component {
     public function updateStatus(): void
     {
         $transaksi = Transaksi::findOrFail($this->selectedId);
-        $hpp = Transaksi::where('invoice', 'like', '%-HPP-' . substr($transaksi->invoice, -4))->first();
         if ($this->newStatus == 'Lunas') {
             $transaksi->update([
                 'status' => $this->newStatus,
@@ -62,16 +59,8 @@ new class extends Component {
                 'uang' => $transaksi->total,
                 'updated_at' => now(),
             ]);
-            $hpp->update([
-                'status' => $this->newStatus,
-                'updated_at' => now(),
-            ]);
         } else {
             $transaksi->update([
-                'status' => $this->newStatus,
-                'updated_at' => now(),
-            ]);
-            $hpp->update([
                 'status' => $this->newStatus,
                 'updated_at' => now(),
             ]);
@@ -115,23 +104,6 @@ new class extends Component {
     {
         $transaksi = Transaksi::findOrFail($id);
 
-        $inv = substr($transaksi->invoice, -4);
-        $part = explode('-', $transaksi->invoice);
-        $tanggal = $part[1];
-
-        $hpp = Transaksi::where('invoice', 'like', "%-$tanggal-HPP-$inv")->first();
-        $hpp->details()->delete();
-        $hpp->delete();
-
-        // 🔄 KEMBALIKAN STOK BARANG
-        foreach ($transaksi->details as $detail) {
-            $barang = Barang::find($detail->barang_id);
-
-            if ($barang) {
-                $barang->increment('stok', $detail->kuantitas);
-            }
-        }
-
         // 🗑 Hapus detail transaksi
         $transaksi->details()->delete();
 
@@ -143,49 +115,31 @@ new class extends Component {
 
     public function headers(): array
     {
-        return [['key' => 'invoice', 'label' => 'Invoice', 'class' => 'w-36'], ['key' => 'tanggal', 'label' => 'Tanggal', 'class' => 'w-16'], ['key' => 'client.name', 'label' => 'Client', 'class' => 'w-16'], ['key' => 'bayar', 'label' => 'Metode', 'class' => 'w-16'], ['key' => 'total', 'label' => 'Total', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'status', 'label' => 'Status', 'class' => 'w-16']];
+        return [['key' => 'invoice', 'label' => 'Invoice', 'class' => 'w-36'], ['key' => 'name', 'label' => 'Deskripsi', 'class' => 'w-36'], ['key' => 'tanggal', 'label' => 'Tanggal', 'class' => 'w-16'], ['key' => 'kategori_name', 'label' => 'Kategori', 'class' => 'w-36'], ['key' => 'total', 'label' => 'Total', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'status', 'label' => 'Status', 'class' => 'w-16']];
     }
 
     public function transaksi(): LengthAwarePaginator
     {
         return Transaksi::query()
-            ->with(['client:id,name,keterangan', 'details.barang:id,name'])
+            ->with(['client:id,name,keterangan', 'details:id,transaksi_id,kategori_id', 'details.kategori:id,name'])
             ->where('type', 'Kredit')
-
-            // 🔍 SEARCH INVOICE
+            ->where('invoice', 'like', '%-LNY-%')
             ->when($this->search, function (Builder $q) {
-                $q->where('invoice', 'like', "%{$this->search}%");
-            })
-
-            // 📦 FILTER BARANG (BENAR)
-            ->when($this->barang_id, function (Builder $q) {
-                $q->whereHas('details', function ($q2) {
-                    $q2->where('barang_id', $this->barang_id);
+                $q->where(function ($query) {
+                    $query->where('invoice', 'like', "%{$this->search}%");
                 });
             })
-
-            // 👤 FILTER CLIENT
-            ->when($this->client_id, fn(Builder $q) => $q->where('client_id', $this->client_id))
-
-            // 📅 FILTER TANGGAL
             ->when($this->startDate, fn(Builder $q) => $q->whereDate('tanggal', '>=', $this->startDate))
             ->when($this->endDate, fn(Builder $q) => $q->whereDate('tanggal', '<=', $this->endDate))
-
             ->orderBy(...array_values($this->sortBy))
             ->paginate($this->perPage);
     }
 
     public function with(): array
     {
-        if ($this->filter >= 0 && $this->filter < 4) {
+        if ($this->filter >= 0 && $this->filter < 3) {
             $this->filter = 0;
             if (!empty($this->search)) {
-                $this->filter++;
-            }
-            if ($this->client_id != 0) {
-                $this->filter++;
-            }
-            if ($this->barang_id != 0) {
                 $this->filter++;
             }
             if ($this->startDate != null) {
@@ -195,8 +149,6 @@ new class extends Component {
 
         return [
             'transaksi' => $this->transaksi(),
-            'barang' => Barang::all(),
-            'client' => Client::where('keterangan', 'Pembeli')->get(),
             'headers' => $this->headers(),
             'perPage' => $this->perPage,
             'pages' => $this->page,
@@ -214,11 +166,11 @@ new class extends Component {
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Transaksi Penjualan" separator progress-indicator>
+    <x-header title="Transaksi Pendapatan Lainnya" separator progress-indicator>
         <x-slot:actions>
             <div class="flex flex-row sm:flex-row gap-2">
                 <x-button wire:click="openExportModal" icon="fas.download" primary>Export Excel</x-button>
-                <x-button label="Create" link="/kasir/create" responsive icon="o-plus" class="btn-primary" />
+                <x-button label="Create" link="/lainnya/create" responsive icon="o-plus" class="btn-primary" />
             </div>
         </x-slot:actions>
     </x-header>
@@ -239,7 +191,19 @@ new class extends Component {
 
     <x-card class="overflow-x-auto">
         <x-table :headers="$headers" :rows="$transaksi" :sort-by="$sortBy" with-pagination
-            link="kasir/{id}/show?invoice={invoice}">
+            link="lainnya/{id}/show?invoice={invoice}">
+            @scope('cell_status', $transaksi)
+                @if ($transaksi->status == 'Lunas')
+                    <span class="badge badge-success">{{ $transaksi->status }}</span>
+                @elseif ($transaksi->status == 'Hutang')
+                    <span class="badge badge-error">{{ $transaksi->status }}</span>
+                @else
+                    <span class="badge badge-ghost">{{ $transaksi->status }}</span>
+                @endif
+            @endscope
+            @scope('cell_kategori_name', $transaksi)
+                {{ $transaksi->details->first()->kategori->name ?? 'N/A' }}
+            @endscope
             @scope('cell_status', $transaksi)
                 @if ($transaksi->status == 'Lunas')
                     <span class="badge badge-success">{{ $transaksi->status }}</span>
@@ -258,13 +222,14 @@ new class extends Component {
                     @endif
                     @if (Auth::user()->role_id == 1 ||
                             (Carbon::parse($transaksi->tanggal)->isSameDay($this->today) && $transaksi->user_id == Auth::user()->id))
-                        <x-button icon="o-pencil" link="/kasir/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
+                        <x-button icon="o-pencil"
+                            link="/lainnya/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
                             class="btn-ghost btn-sm text-yellow-500" tooltip="Edit" />
                     @endif
-                    <x-button icon="o-pencil-square" wire:click="openStatusModal({{ $transaksi->id }})"
+                    {{-- <x-button icon="o-pencil-square" wire:click="openStatusModal({{ $transaksi->id }})"
                         class="btn-ghost btn-sm text-purple-500" tooltip="Update Status" />
-                    <x-button icon="o-printer" link="/kasir/{{ $transaksi->id }}/print"
-                        class="btn-ghost btn-sm text-blue-500" tooltip="Print Struk" />
+                    <x-button icon="o-printer" link="/lainnya/{{ $transaksi->id }}/print"
+                        class="btn-ghost btn-sm text-blue-500" tooltip="Print Struk" /> --}}
                 </div>
             @endscope
         </x-table>
@@ -275,12 +240,6 @@ new class extends Component {
         <div class="grid gap-5">
             <x-input placeholder="Cari Invoice..." wire:model.live.debounce="search" clearable
                 icon="o-magnifying-glass" />
-
-            <x-choices-offline placeholder="Pilih Client" wire:model.live="client_id" :options="$client" icon="o-user"
-                single searchable />
-
-            <x-choices-offline placeholder="Pilih Barang" wire:model.live="barang_id" :options="$barang" icon="o-flag"
-                single searchable />
 
             <!-- ✅ Tambahkan Filter Tanggal -->
             <x-input label="Tanggal Awal" type="date" wire:model.live="startDate" />

@@ -26,6 +26,10 @@ new class extends Component {
 
     #[Rule('required')]
     public array $details = [];
+
+    #[Rule('required')]
+    public ?string $bayar = null;
+
     public $barangs;
 
     /* =====================
@@ -37,6 +41,7 @@ new class extends Component {
             'barangs' => $this->barangs,
             'clients' => Client::where('name', 'like', '%Kandang Kambing%')->get(),
             'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
+            'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
 
@@ -49,6 +54,7 @@ new class extends Component {
         $this->invoice = $transaksi->invoice;
         $this->tanggal = $transaksi->tanggal;
         $this->client_id = $transaksi->client_id;
+        $this->bayar = $transaksi->bayar;
         $this->barangs = Barang::all();
 
         // cari transaksi HPP pasangan
@@ -160,9 +166,9 @@ new class extends Component {
 
         $this->transaksi->update([
             'client_id' => $this->client_id,
+            'bayar' => $this->bayar,
             'total' => $this->total,
             'status' => 'Hutang',
-            'kembalian' => 0,
         ]);
 
         $totalHPP = 0;
@@ -187,7 +193,7 @@ new class extends Component {
             $totalHPP += $barang->hpp * $item['kuantitas'];
         }
 
-        $this->hpp->update(['total' => $totalHPP]);
+        $this->hpp->update(['total' => $totalHPP, 'client_id' => $this->client_id, 'bayar' => $this->bayar]);
 
         foreach ($this->details as $item) {
             $barang = Barang::find($item['barang_id']);
@@ -282,9 +288,11 @@ new class extends Component {
 
                     <!-- TOTAL, UANG, KEMBALIAN -->
                     <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
+
+                        <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
+                            placeholder="Pilih Metode" />
                     </div>
 
                 </div>

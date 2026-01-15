@@ -30,6 +30,9 @@ new class extends Component {
     #[Rule('required')]
     public ?string $tanggal = null;
 
+    #[Rule('required')]
+    public ?string $bayar = null;
+
     #[Rule('required|array|min:1')]
     public array $details = [];
 
@@ -44,6 +47,7 @@ new class extends Component {
             'barangs' => $this->barangs,
             'clients' => Client::where('name', 'like', '%Kandang Kambing%')->get(),
             'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
+            'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
 
@@ -153,6 +157,7 @@ new class extends Component {
             'type' => 'Kredit',
             'total' => $this->total,
             'status' => 'Hutang',
+            'bayar' => $this->bayar,
             'uang' => 0,
             'kembalian' => max(0, $this->uang - $this->total),
         ]);
@@ -184,6 +189,7 @@ new class extends Component {
             'type' => 'Debit',
             'total' => $totalHPP,
             'status' => 'Hutang',
+            'bayar' => $this->bayar,
         ]);
 
         foreach ($this->details as $item) {
@@ -224,7 +230,7 @@ new class extends Component {
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Tambah Transaksi Piutang Kanfang" separator progress-indicator />
+    <x-header title="Tambah Transaksi Piutang Kandang" separator progress-indicator />
 
     <x-form wire:submit="save">
 
@@ -299,6 +305,8 @@ new class extends Component {
                     <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
+                        <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
+                            placeholder="Pilih Metode" />
                     </div>
 
                 </div>

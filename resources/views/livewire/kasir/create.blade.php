@@ -30,6 +30,9 @@ new class extends Component {
     #[Rule('required')]
     public ?string $tanggal = null;
 
+    #[Rule('required')]
+    public ?string $bayar = null;
+
     #[Rule('required|array|min:1')]
     public array $details = [];
 
@@ -44,6 +47,7 @@ new class extends Component {
             'barangs' => $this->barangs,
             'clients' => Client::where('keterangan', 'like', '%Pembeli%')->get(),
             'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
+            'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
 
@@ -156,6 +160,7 @@ new class extends Component {
             'type' => 'Kredit',
             'total' => $this->total,
             'status' => $status,
+            'bayar' => $this->bayar,
             'uang' => $this->uang,
             'kembalian' => max(0, $this->uang - $this->total),
         ]);
@@ -187,6 +192,7 @@ new class extends Component {
             'type' => 'Debit',
             'total' => $totalHPP,
             'status' => $status,
+            'bayar' => $this->bayar,
         ]);
 
         foreach ($this->details as $item) {
@@ -299,10 +305,13 @@ new class extends Component {
                     <x-button icon="o-plus" class="btn-primary" wire:click="addDetail" label="Tambah Item" />
 
                     <!-- TOTAL, UANG, KEMBALIAN -->
-                    <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
 
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
+
+                        <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
+                            placeholder="Pilih Metode" />
 
                         <x-input label="Uang Diterima" wire:model.live="uang" prefix="Rp " money
                             class="font-bold text-lg" />

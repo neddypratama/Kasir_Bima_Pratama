@@ -39,7 +39,7 @@ new class extends Component {
     public function with(): array
     {
         return [
-            'kategori' => Kategori::where('name', 'like', 'Beban%')->get(),
+            'kategori' => Kategori::where('name', 'like', 'Pendapatan Lainnya%')->get(),
             'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
@@ -59,7 +59,7 @@ new class extends Component {
         $tanggal = \Carbon\Carbon::parse($value)->format('Ymd');
         $rand = Str::upper(Str::random(4));
 
-        $this->invoice = "INV-$tanggal-BBN-$rand";
+        $this->invoice = "INV-$tanggal-LNY-$rand";
     }
 
     /* =====================
@@ -77,7 +77,7 @@ new class extends Component {
             'user_id' => $this->user_id,
             'tanggal' => $this->tanggal,
             'client_id' => null,
-            'type' => 'Debit',
+            'type' => 'Kredit',
             'total' => $this->total,
             'bayar' => $this->bayar,
             'status' => 'Lunas',
@@ -94,13 +94,13 @@ new class extends Component {
             'sub_total' => $this->total,
         ]);
 
-        $this->success('Transaksi berhasil dibuat!', redirectTo: '/keluar');
+        $this->success('Transaksi berhasil dibuat!', redirectTo: '/lainnya');
     }
 };
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Tambah Transaksi Pengeluaran" separator progress-indicator />
+    <x-header title="Tambah Transaksi Pendapatan" separator progress-indicator />
 
     <x-form wire:submit="save">
 
@@ -119,19 +119,19 @@ new class extends Component {
                     </div>
                     <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <div class="col-span-2">
-                            <x-input label="Deskripsi Pengeluaran" wire:model="name"
-                                placeholder="Contoh: Bayar Karyawan" />
+                            <x-input label="Deskripsi Pendapatan" wire:model="name"
+                                placeholder="Contoh: Upah kirim jagung" />
                         </div>
                         <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
                             placeholder="Pilih Metode" />
-                        <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                        <x-input label="Total Pendapatan" wire:model.live="total" prefix="Rp " money="IDR" />
                     </div>
                 </div>
             </div>
         </x-card>
 
         <x-slot:actions>
-            <x-button label="Cancel" link="/keluar" />
+            <x-button label="Cancel" link="/lainnya" />
             <x-button label="Save" class="btn-primary" type="submit" spinner="save" />
         </x-slot:actions>
 
