@@ -40,7 +40,6 @@ new class extends Component {
         return [
             'barangs' => $this->barangs,
             'clients' => Client::where('name', 'like', '%Kandang Kambing%')->get(),
-            'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
             'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
@@ -65,20 +64,12 @@ new class extends Component {
 
         foreach ($transaksi->details as $detail) {
             $barang = $detail->barang;
-            $satuan = '';
-
-            if ($barang->harga_eceran == $detail->value) {
-                $satuan = 'Eceran';
-            } else {
-                $satuan = 'Partai';
-            }
 
             // 🔥 stok awal = stok sekarang + qty lama × konversi lama
             $stokAwal = $barang->stok + $detail->kuantitas;
 
             $this->details[] = [
                 'barang_id' => $barang->id,
-                'satuan' => $satuan,
                 'value' => $detail->value,
                 'kuantitas' => $detail->kuantitas,
                 'stok_awal' => $stokAwal,
@@ -104,24 +95,7 @@ new class extends Component {
                 $this->details[$index]['stok_awal'] = $barang->stok;
                 $this->details[$index]['max_qty'] = $barang->stok;
                 $this->details[$index]['kuantitas'] = 1;
-
-                if ($this->details[$index]['satuan'] == 'Eceran') {
-                    $this->details[$index]['value'] = $barang->harga_eceran;
-                } else {
-                    $this->details[$index]['value'] = $barang->harga_sak;
-                }
-            }
-        }
-
-        if (str_ends_with($key, '.satuan')) {
-            $barang = Barang::find($this->details[$index]['barang_id']);
-
-            if ($barang) {
-                if ($this->details[$index]['satuan'] == 'Eceran') {
-                    $this->details[$index]['value'] = $barang->harga_eceran;
-                } else {
-                    $this->details[$index]['value'] = $barang->harga_sak;
-                }
+                $this->details[$index]['value'] = $barang->hpp;
             }
         }
 
@@ -149,7 +123,6 @@ new class extends Component {
         $this->validate([
             'client_id' => 'required',
             'details.*.barang_id' => 'required',
-            'details.*.satuan' => 'required',
             'details.*.kuantitas' => 'required|min:1',
         ]);
 
@@ -265,8 +238,7 @@ new class extends Component {
                                         @endscope
                                     </x-choices-offline>
                                 </div>
-                                <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
-                                    :options="$satuan" placeholder="Pilih Satuan" />
+                                <x-input label="Satuan" placeholder="Kg" readonly />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
                                 <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
