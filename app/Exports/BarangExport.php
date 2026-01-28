@@ -32,6 +32,8 @@ class BarangExport implements FromCollection, WithHeadings, ShouldAutoSize, With
             'Jenis Barang',
             'Stok',
             'HPP',
+            'Harga Eceran',
+            'Harga Partai',
             'Tanggal Dibuat',
         ];
     }
@@ -46,6 +48,8 @@ class BarangExport implements FromCollection, WithHeadings, ShouldAutoSize, With
                 $client->jenis->name,
                 $client->stok ?? 0,
                 $client->hpp ?? 0,
+                $client->harga_eceran ?? 0,
+                $client->harga_sak ?? 0,
                 $client->created_at,
             ];
         return $rows;

@@ -26,4 +26,9 @@ class Barang extends Model
     {
         return $this->hasMany(DetailTransaksi::class);
     }
+
+    public function stokBatches()
+    {
+        return $this->hasMany(StokBatch::class);
+    }
 }

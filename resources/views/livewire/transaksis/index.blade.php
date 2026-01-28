@@ -8,7 +8,7 @@ use Mary\Traits\Toast;
 use Livewire\WithPagination;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Exports\PenjualanSentratExport;
+use App\Exports\TransaksiExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
@@ -63,7 +63,7 @@ new class extends Component {
         $this->exportModal = false;
         $this->success('Export sedang diproses...', position: 'toast-top');
 
-        return Excel::download(new PenjualanSentratExport($this->startDate, $this->endDate), 'penjualan-pakan.xlsx');
+        return Excel::download(new TransaksiExport($this->startDate, $this->endDate), 'transaksi.xlsx');
     }
 
     public function headers(): array

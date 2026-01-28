@@ -3,13 +3,13 @@
 namespace App\Exports;
 
 use App\Models\Transaksi;
-use Illuminate\Contracts\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Illuminate\Database\Eloquent\Builder;
 
-class PembelianSentratExport implements FromCollection, WithHeadings, ShouldAutoSize, WithMapping
+class BonKandangExport implements FromCollection, WithHeadings, ShouldAutoSize, WithMapping
 {
     protected $startDate;
     protected $endDate;
@@ -25,10 +25,12 @@ class PembelianSentratExport implements FromCollection, WithHeadings, ShouldAuto
      */
     public function collection()
     {
-        return Transaksi::with(['client:id,name', 'details.kategori:id,name,type'])
-            ->where('invoice', 'like', '%-STR-%')
-            ->where('type', 'Debit')
-            ->whereHas('details.kategori', fn(Builder $q) => $q->where('name', 'like', '%Stok Pakan%'))
+        return Transaksi::with(['client:id,name,keterangan', 'details.barang:id,name'])
+            ->where('type', 'Kredit')
+            ->where('status', 'Hutang')
+            ->whereHas('client', function ($q2) {
+                $q2->where('name', 'like', 'Kandang Kambing%');
+            })
             ->when($this->startDate, fn($q) => $q->whereDate('tanggal', '>=', $this->startDate))
             ->when($this->endDate, fn($q) => $q->whereDate('tanggal', '<=', $this->endDate))
             ->orderBy('tanggal', 'asc')
@@ -60,6 +62,8 @@ class PembelianSentratExport implements FromCollection, WithHeadings, ShouldAuto
     public function map($transaksi): array
     {
         $rows = [];
+
+        // dd($transaksi);
 
         foreach ($transaksi->details as $detail) {
             $rows[] = [

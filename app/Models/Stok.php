@@ -14,8 +14,6 @@ class Stok extends Model
         'tambah',
         'kurang',
         'kotor',
-        'bentes',
-        'ceplok',
         'rusak'
     ];
 

@@ -12,7 +12,7 @@ use Mary\Traits\Toast;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\WithPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Exports\PenjualanSentratExport;
+use App\Exports\PembelianTelurExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
@@ -99,7 +99,7 @@ new class extends Component {
         $this->exportModal = false;
         $this->success('Export dimulai...', position: 'toast-top');
 
-        return Excel::download(new PenjualanSentratExport($this->startDate, $this->endDate), 'penjualan-pakan.xlsx');
+        return Excel::download(new PembelianTelurExport($this->startDate, $this->endDate), 'pembelian.xlsx');
     }
 
     public function delete($id): void

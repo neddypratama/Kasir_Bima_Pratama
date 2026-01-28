@@ -26,9 +26,7 @@ class StokPakanExport implements FromCollection, WithHeadings, ShouldAutoSize, W
      */
     public function collection()
     {
-        return Stok::with(['user', 'barang.jenis', 'barang'])->whereHas('barang.jenis', function ($q) {
-                $q->where('name', 'like', 'Pakan%');
-            })
+        return Stok::with(['user', 'barang.jenis', 'barang'])
             ->when($this->startDate, fn($q) => $q->whereDate('tanggal', '>=', $this->startDate))
             ->when($this->endDate, fn($q) => $q->whereDate('tanggal', '<=', $this->endDate))
             ->orderBy('tanggal', 'asc')

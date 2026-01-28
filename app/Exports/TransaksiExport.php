@@ -25,7 +25,7 @@ class TransaksiExport implements FromCollection, WithHeadings, ShouldAutoSize, W
      */
     public function collection()
     {
-        return Transaksi::with(['client:id,name', 'details.kategori:id,name,type'])
+        return Transaksi::with(['client', 'details'])
             ->when($this->startDate, fn($q) => $q->whereDate('tanggal', '>=', $this->startDate))
             ->when($this->endDate, fn($q) => $q->whereDate('tanggal', '<=', $this->endDate))
             ->orderBy('tanggal', 'asc')
@@ -48,6 +48,7 @@ class TransaksiExport implements FromCollection, WithHeadings, ShouldAutoSize, W
             'Harga Satuan',
             'Subtotal',
             'Total',
+            'Status',
             'Pembuat'
         ];
     }
@@ -63,7 +64,7 @@ class TransaksiExport implements FromCollection, WithHeadings, ShouldAutoSize, W
         foreach ($transaksi->details as $detail) {
             $rows[] = [
                 $transaksi->invoice,
-                $transaksi->name,
+                $transaksi->name ?? '-',
                 $transaksi->tanggal,
                 $transaksi->client?->name ?? '-',
                 $detail->kategori?->name ?? '-',
@@ -72,6 +73,7 @@ class TransaksiExport implements FromCollection, WithHeadings, ShouldAutoSize, W
                 $detail->value ?? 0,
                 $detail->kuantitas * ($detail->value ?? 0),
                 $transaksi->total,
+                $transaksi->status,
                 $transaksi->user->name
             ];
         }

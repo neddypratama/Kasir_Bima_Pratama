@@ -5,6 +5,9 @@ use App\Models\Transaksi;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use App\Exports\AsetExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 new class extends Component {
     public ?string $startDate = null;
@@ -28,6 +31,11 @@ new class extends Component {
         if (in_array($field, ['startDate', 'endDate'])) {
             $this->generateReport();
         }
+    }
+
+    public function export(): BinaryFileResponse
+    {
+        return Excel::download(new AsetExport($this->startDate, $this->endDate), 'aset.xlsx');
     }
 
     /* ======================

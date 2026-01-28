@@ -3,8 +3,8 @@
 namespace App\Exports;
 
 use App\Models\Transaksi;
-use App\Models\Kategori;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
@@ -12,7 +12,12 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class LabaRugiExport implements FromArray, WithHeadings, WithTitle, ShouldAutoSize, WithStyles
+class LabaRugiExport implements
+    FromArray,
+    WithHeadings,
+    WithTitle,
+    ShouldAutoSize,
+    WithStyles
 {
     protected string $startDate;
     protected string $endDate;
@@ -20,118 +25,112 @@ class LabaRugiExport implements FromArray, WithHeadings, WithTitle, ShouldAutoSi
     public function __construct(string $startDate, string $endDate)
     {
         $this->startDate = $startDate;
-        $this->endDate = $endDate;
+        $this->endDate   = $endDate;
     }
 
+    /* ======================
+        HEADER
+    ====================== */
     public function headings(): array
     {
         return [
-            ['Laporan Laba Rugi'],
-            ['Periode: ' . Carbon::parse($this->startDate)->format('d M Y') . ' - ' . Carbon::parse($this->endDate)->format('d M Y')],
+            ['LAPORAN LABA RUGI'],
+            ['Periode: ' .
+                Carbon::parse($this->startDate)->format('d M Y') .
+                ' - ' .
+                Carbon::parse($this->endDate)->format('d M Y')],
             [],
             ['Kategori', 'Tipe', 'Total (Rp)'],
         ];
     }
 
+    /* ======================
+        DATA
+    ====================== */
     public function array(): array
     {
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end = Carbon::parse($this->endDate)->endOfDay();
-
-        $kategoriPendapatan = Kategori::where('type', 'Pendapatan')->where('name', 'not like' ,'%Truk%')->pluck('name');
-        $kategoriPengeluaran = Kategori::where('type', 'Pengeluaran')->where('name', 'not like' ,'%Truk%')->pluck('name');
-
-        // == Pendapatan ==
-        $pendapatan = Transaksi::with('details.kategori')
-            ->whereHas('details.kategori', fn($q) => $q->where('type', 'Pendapatan'))
-            ->whereBetween('tanggal', [$start, $end])
-            ->get()
-            ->flatMap(fn($trx) => $trx->details)
-            ->filter(fn($d) => $d->kategori && $d->kategori->type == 'Pendapatan')
-            ->groupBy(fn($d) => $d->kategori->name)
-            ->map(function ($group) {
-                $kredit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'kredit')->sum('sub_total');
-                $debit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'debit')->sum('sub_total');
-                return $kredit - $debit;
-            });
-
-        // == Pengeluaran ==
-        $pengeluaran = Transaksi::with('details.kategori')
-            ->whereHas('details.kategori', fn($q) => $q->where('type', 'Pengeluaran'))
-            ->whereBetween('tanggal', [$start, $end])
-            ->get()
-            ->flatMap(fn($trx) => $trx->details)
-            ->filter(fn($d) => $d->kategori && $d->kategori->type == 'Pengeluaran')
-            ->groupBy(fn($d) => $d->kategori->name)
-            ->map(function ($group) {
-                $debit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'debit')->sum('sub_total');
-                $kredit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'kredit')->sum('sub_total');
-                return $debit - $kredit;
-            });
-
-        $bebanPajak = Transaksi::with('details.kategori')
-            ->whereHas('details.kategori', fn($q) => $q->where('type', 'Pengeluaran')->where('name', 'Beban Pajak'))
-            ->whereBetween('tanggal', [$start, $end])
-            ->get()
-            ->flatMap(fn($trx) => $trx->details)
-            ->filter(fn($d) => $d->kategori && $d->kategori->type == 'Pengeluaran' && $d->kategori->name == 'Beban Pajak')
-            ->sum('sub_total');
-
-        $pendapatanData = $kategoriPendapatan
-            ->mapWithKeys(fn($name) => [$name => $pendapatan[$name] ?? 0])
-            ->toArray();
-
-        $pengeluaranData = $kategoriPengeluaran
-            ->mapWithKeys(fn($name) => [$name => $pengeluaran[$name] ?? 0])
-            ->toArray();
-
-        $totalPendapatan = array_sum($pendapatanData);
-        $totalPengeluaran = array_sum($pengeluaranData);
-        $labaSebelumPajak = $totalPendapatan - $totalPengeluaran;
-        $labaSetelahPajak = $labaSebelumPajak - $bebanPajak;
-
         $rows = [];
 
-        // Bagian Pendapatan
-        $rows[] = ['Pendapatan', '', ''];
-        foreach ($pendapatanData as $kategori => $total) {
-            $rows[] = [$kategori, 'Pendapatan', $total];
+        $start = Carbon::parse($this->startDate)->startOfDay();
+        $end   = Carbon::parse($this->endDate)->endOfDay();
+
+        $data = DB::table('detail_transaksis as dt')
+            ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
+            ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
+            ->join('transaksis as t', 't.id', '=', 'dt.transaksi_id')
+            ->select(
+                'l.name as laporan',
+                'l.type',
+                'k.name as kategori',
+                DB::raw('SUM(dt.sub_total) as total')
+            )
+            ->where('t.status', 'Lunas')
+            ->whereBetween('t.tanggal', [$start, $end])
+            ->groupBy('l.name', 'l.type', 'k.name')
+            ->get();
+
+        $pendapatan = [];
+        $pengeluaran = [];
+
+        foreach ($data as $row) {
+            if ($row->type === 'Pendapatan') {
+                $pendapatan[$row->laporan] =
+                    ($pendapatan[$row->laporan] ?? 0) + $row->total;
+            }
+
+            if ($row->type === 'Pengeluaran') {
+                $pengeluaran[$row->laporan] =
+                    ($pengeluaran[$row->laporan] ?? 0) + $row->total;
+            }
         }
+
+        /* ===== PENDAPATAN ===== */
+        $rows[] = ['Pendapatan', '', ''];
+        foreach ($pendapatan as $nama => $total) {
+            $rows[] = [$nama, 'Pendapatan', $total];
+        }
+        $totalPendapatan = array_sum($pendapatan);
         $rows[] = ['Total Pendapatan', '', $totalPendapatan];
         $rows[] = [];
 
-        // Bagian Pengeluaran
+        /* ===== PENGELUARAN ===== */
         $rows[] = ['Pengeluaran', '', ''];
-        foreach ($pengeluaranData as $kategori => $total) {
-            $rows[] = [$kategori, 'Pengeluaran', $total];
+        foreach ($pengeluaran as $nama => $total) {
+            $rows[] = [$nama, 'Pengeluaran', $total];
         }
+        $totalPengeluaran = array_sum($pengeluaran);
         $rows[] = ['Total Pengeluaran', '', $totalPengeluaran];
         $rows[] = [];
 
-        // Ringkasan
-        $rows[] = ['Laba Sebelum Pajak', '', $labaSebelumPajak];
-        $rows[] = ['Beban Pajak', '', $bebanPajak];
-        $rows[] = ['Laba Setelah Pajak', '', $labaSetelahPajak];
+        /* ===== LABA / RUGI ===== */
+        $rows[] = ['Laba / Rugi', '', $totalPendapatan - $totalPengeluaran];
 
         return $rows;
     }
 
     public function title(): string
     {
-        return 'Laporan Laba Rugi';
+        return 'Laba Rugi';
     }
 
+    /* ======================
+        STYLING
+    ====================== */
     public function styles(Worksheet $sheet)
     {
         $sheet->mergeCells('A1:C1');
         $sheet->mergeCells('A2:C2');
 
-        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-        $sheet->getStyle('A2')->getFont()->setItalic(true);
-        $sheet->getStyle('A4:C4')->getFont()->setBold(true);
+        $sheet->getStyle('A1')->getFont()
+            ->setBold(true)
+            ->setSize(14);
 
-        return [
-            'A4:C4' => ['font' => ['bold' => true]],
-        ];
+        $sheet->getStyle('A2')->getFont()
+            ->setItalic(true);
+
+        $sheet->getStyle('A4:C4')->getFont()
+            ->setBold(true);
+
+        return [];
     }
 }

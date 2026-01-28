@@ -37,8 +37,6 @@ class ClientExport implements FromCollection, WithHeadings, ShouldAutoSize, With
             'Tipe',
             'Alamat',
             'keterangan',
-            'Bon',
-            'Titipan',
         ];
     }
 
@@ -52,8 +50,6 @@ class ClientExport implements FromCollection, WithHeadings, ShouldAutoSize, With
                 $client->type,
                 $client->alamat,
                 $client->keterangan,
-                $client->bon ?? 0,
-                $client->titipan ?? 0,
             ];
         return $rows;
     }

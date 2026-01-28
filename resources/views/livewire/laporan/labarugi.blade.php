@@ -4,6 +4,9 @@
     use App\Models\Transaksi;
     use Carbon\Carbon;
     use Illuminate\Support\Facades\DB;
+    use App\Exports\LabaRugiExport;
+    use Maatwebsite\Excel\Facades\Excel;
+    use Symfony\Component\HttpFoundation\BinaryFileResponse;
     
     new class extends Component {
         public $startDate;
@@ -28,6 +31,11 @@
             if (in_array($field, ['startDate', 'endDate'])) {
                 $this->generateReport();
             }
+        }
+    
+        public function export(): BinaryFileResponse
+        {
+            return Excel::download(new LabaRugiExport($this->startDate, $this->endDate), 'laba_rugi.xlsx');
         }
     
         /* ======================

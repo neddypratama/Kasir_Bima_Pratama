@@ -3,8 +3,9 @@
 namespace App\Exports;
 
 use App\Models\Transaksi;
-use App\Models\Kategori;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithTitle;
@@ -12,98 +13,141 @@ use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithStyles;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class AsetExport implements FromArray, WithHeadings, WithTitle, ShouldAutoSize, WithStyles
+class AsetExport implements
+    FromArray,
+    WithHeadings,
+    WithTitle,
+    ShouldAutoSize,
+    WithStyles
 {
-    protected string $startDate;
-    protected string $endDate;
+    protected ?string $startDate;
+    protected ?string $endDate;
 
-    public function __construct(string $startDate, string $endDate)
+    public function __construct($startDate = null, $endDate = null)
     {
         $this->startDate = $startDate;
-        $this->endDate = $endDate;
+        $this->endDate   = $endDate;
     }
 
+    /* ======================
+        HEADER
+    ====================== */
     public function headings(): array
     {
         return [
-            ['Laporan Aset'],
-            ['Periode: ' . Carbon::parse($this->startDate)->format('d M Y') . ' - ' . Carbon::parse($this->endDate)->format('d M Y')],
+            ['LAPORAN ASET'],
+            ['Periode: ' .
+                ($this->startDate
+                    ? Carbon::parse($this->startDate)->format('d M Y')
+                    : '-') .
+                ' - ' .
+                ($this->endDate
+                    ? Carbon::parse($this->endDate)->format('d M Y')
+                    : '-')],
             [],
             ['Kategori', 'Tipe', 'Total (Rp)'],
         ];
     }
 
+    /* ======================
+        DATA
+    ====================== */
     public function array(): array
     {
-        $start = Carbon::parse($this->startDate)->startOfDay();
-        $end = Carbon::parse($this->endDate)->endOfDay();
-
-        $kategoriAset = Kategori::where('type', 'Aset')->pluck('name');
-        $kategoriLiabilitas = Kategori::where('type', 'Liabilitas')->pluck('name');
-
-        // == Aset ==
-        $Aset = Transaksi::with('details.kategori')
-            ->whereHas('details.kategori', fn($q) => $q->where('type', 'Aset'))
-            ->whereBetween('tanggal', [$start, $end])
-            ->get()
-            ->flatMap(fn($trx) => $trx->details)
-            ->filter(fn($d) => $d->kategori && $d->kategori->type == 'Aset')
-            ->groupBy(fn($d) => $d->kategori->name)
-            ->map(function ($group) {
-                $kredit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'kredit')->sum('sub_total');
-                $debit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'debit')->sum('sub_total');
-                return $debit - $kredit;
-            });
-
-        // == Liabilitas ==
-        $Liabilitas = Transaksi::with('details.kategori')
-            ->whereHas('details.kategori', fn($q) => $q->where('type', 'Liabilitas'))
-            ->whereBetween('tanggal', [$start, $end])
-            ->get()
-            ->flatMap(fn($trx) => $trx->details)
-            ->filter(fn($d) => $d->kategori && $d->kategori->type == 'Liabilitas')
-            ->groupBy(fn($d) => $d->kategori->name)
-            ->map(function ($group) {
-                $debit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'debit')->sum('sub_total');
-                $kredit = $group->filter(fn($d) => strtolower($d->transaksi->type ?? '') == 'kredit')->sum('sub_total');
-                return $kredit - $debit;
-            });
-
-        $bebanPajak = Transaksi::with('details.kategori')
-            ->whereHas('details.kategori', fn($q) => $q->where('type', 'Liabilitas')->where('name', 'Beban Pajak'))
-            ->whereBetween('tanggal', [$start, $end])
-            ->get()
-            ->flatMap(fn($trx) => $trx->details)
-            ->filter(fn($d) => $d->kategori && $d->kategori->type == 'Liabilitas' && $d->kategori->name == 'Beban Pajak')
-            ->sum('sub_total');
-
-        $AsetData = $kategoriAset
-            ->mapWithKeys(fn($name) => [$name => $Aset[$name] ?? 0])
-            ->toArray();
-
-        $LiabilitasData = $kategoriLiabilitas
-            ->mapWithKeys(fn($name) => [$name => $Liabilitas[$name] ?? 0])
-            ->toArray();
-
-        $totalAset = array_sum($AsetData);
-        $totalLiabilitas = array_sum($LiabilitasData);
-
         $rows = [];
 
-        // Bagian Aset
-        $rows[] = ['Aset', '', ''];
-        foreach ($AsetData as $kategori => $total) {
-            $rows[] = [$kategori, 'Aset', $total];
+        $first = Transaksi::orderBy('tanggal')->first();
+        $last  = Transaksi::orderByDesc('tanggal')->first();
+
+        if (!$first || !$last) {
+            return [];
         }
-        $rows[] = ['Total Aset', '', $totalAset];
+
+        $start = $this->startDate
+            ? Carbon::parse($this->startDate)->startOfDay()
+            : Carbon::parse($first->tanggal)->startOfDay();
+
+        $end = $this->endDate
+            ? Carbon::parse($this->endDate)->endOfDay()
+            : Carbon::parse($last->tanggal)->endOfDay();
+
+
+        $data = DB::table('detail_transaksis as dt')
+            ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
+            ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
+            ->join('transaksis as t', 't.id', '=', 'dt.transaksi_id')
+            ->select(
+                'l.name as laporan',
+                'l.type',
+                'k.name as kategori',
+                't.type as transaksi_type',
+                't.status',
+                DB::raw('SUM(dt.sub_total) as total')
+            )
+            ->whereBetween('t.tanggal', [$start, $end])
+            ->groupBy(
+                'l.name',
+                'l.type',
+                'k.name',
+                't.type',
+                't.status'
+            )
+            ->get();
+
+        $aset = [];
+        $liabilitas = [];
+
+        foreach ($data as $row) {
+            $laporan  = $row->laporan;
+            $kategori = $row->kategori;
+            $nilai    = (float) $row->total;
+
+            /* ===== ASET ===== */
+            if (
+                ($row->type === 'Pendapatan' &&
+                    $row->transaksi_type === 'Kredit' &&
+                    $row->status === 'Hutang')
+                ||
+                ($row->type === 'Aset' &&
+                    $row->transaksi_type === 'Stok' &&
+                    $row->status === 'Lunas')
+            ) {
+                if (Str::startsWith($laporan, 'Penjualan ')) {
+                    $laporan = 'Bon ' . Str::after($laporan, 'Penjualan ');
+                }
+
+                $aset[$laporan] = ($aset[$laporan] ?? 0) + $nilai;
+            }
+
+            /* ===== LIABILITAS ===== */
+            if (
+                $row->type === 'Aset' &&
+                $row->transaksi_type === 'Stok' &&
+                $row->status === 'Hutang'
+            ) {
+                if (Str::startsWith($laporan, 'Stok ')) {
+                    $laporan = 'Hutang ' . Str::after($laporan, 'Stok ');
+                }
+
+                $liabilitas[$laporan] =
+                    ($liabilitas[$laporan] ?? 0) + $nilai;
+            }
+        }
+
+        /* ===== SECTION ASET ===== */
+        $rows[] = ['Aset', '', ''];
+        foreach ($aset as $nama => $total) {
+            $rows[] = [$nama, 'Aset', $total];
+        }
+        $rows[] = ['Total Aset', '', array_sum($aset)];
         $rows[] = [];
 
-        // Bagian Liabilitas
+        /* ===== SECTION LIABILITAS ===== */
         $rows[] = ['Liabilitas', '', ''];
-        foreach ($LiabilitasData as $kategori => $total) {
-            $rows[] = [$kategori, 'Liabilitas', $total];
+        foreach ($liabilitas as $nama => $total) {
+            $rows[] = [$nama, 'Liabilitas', $total];
         }
-        $rows[] = ['Total Liabilitas', '', $totalLiabilitas];
+        $rows[] = ['Total Liabilitas', '', array_sum($liabilitas)];
         $rows[] = [];
 
         return $rows;
@@ -114,17 +158,24 @@ class AsetExport implements FromArray, WithHeadings, WithTitle, ShouldAutoSize, 
         return 'Laporan Aset';
     }
 
+    /* ======================
+        STYLING
+    ====================== */
     public function styles(Worksheet $sheet)
     {
         $sheet->mergeCells('A1:C1');
         $sheet->mergeCells('A2:C2');
 
-        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
-        $sheet->getStyle('A2')->getFont()->setItalic(true);
-        $sheet->getStyle('A4:C4')->getFont()->setBold(true);
+        $sheet->getStyle('A1')->getFont()
+            ->setBold(true)
+            ->setSize(14);
 
-        return [
-            'A4:C4' => ['font' => ['bold' => true]],
-        ];
+        $sheet->getStyle('A2')->getFont()
+            ->setItalic(true);
+
+        $sheet->getStyle('A4:C4')->getFont()
+            ->setBold(true);
+
+        return [];
     }
 }

@@ -12,7 +12,7 @@ use Mary\Traits\Toast;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\WithPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Exports\PenjualanSentratExport;
+use App\Exports\PenjualanTelurExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
@@ -108,7 +108,7 @@ new class extends Component {
         $this->exportModal = false;
         $this->success('Export dimulai...', position: 'toast-top');
 
-        return Excel::download(new PenjualanSentratExport($this->startDate, $this->endDate), 'penjualan-pakan.xlsx');
+        return Excel::download(new PenjualanTelurExport($this->startDate, $this->endDate), 'penjualan.xlsx');
     }
 
     public function delete($id): void
@@ -151,6 +151,12 @@ new class extends Component {
         return Transaksi::query()
             ->with(['client:id,name,keterangan', 'details.barang:id,name'])
             ->where('type', 'Kredit')
+            ->whereHas('details.kategori', function (Builder $q) {
+                $q->where('name', 'like', 'Penjualan%');
+            })
+            ->whereHas('client', function (Builder $q) {
+                $q->where('name', 'not like', 'Kandang Kambing%');
+            })
 
             // 🔍 SEARCH INVOICE
             ->when($this->search, function (Builder $q) {

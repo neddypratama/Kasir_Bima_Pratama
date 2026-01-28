@@ -25,10 +25,8 @@ class PembelianTelurExport implements FromCollection, WithHeadings, ShouldAutoSi
      */
     public function collection()
     {
-        return Transaksi::with(['client:id,name,keterangan', 'details.kategori:id,name,type'])
-            ->where('invoice', 'like', '%-TLR-%')
-            ->where('type', 'Debit')
-            ->whereHas('details.kategori', fn(Builder $q) => $q->where('name', 'like', '%Stok Telur%'))
+        return Transaksi::with(['client:id,name,keterangan', 'details.kategori:id,name'])
+            ->where('type', 'Stok')
             ->when($this->startDate, fn($q) => $q->whereDate('tanggal', '>=', $this->startDate))
             ->when($this->endDate, fn($q) => $q->whereDate('tanggal', '<=', $this->endDate))
             ->orderBy('tanggal', 'asc')
@@ -51,7 +49,9 @@ class PembelianTelurExport implements FromCollection, WithHeadings, ShouldAutoSi
             'Kuantitas',
             'Harga Satuan',
             'Subtotal',
-            'Pembuat'
+            'Status',
+            'Pembayaran',
+            'Pembuat',
         ];
     }
 
@@ -74,6 +74,8 @@ class PembelianTelurExport implements FromCollection, WithHeadings, ShouldAutoSi
                 $detail->kuantitas,
                 $detail->value ?? 0,
                 $detail->kuantitas * ($detail->value ?? 0),
+                $transaksi->status,
+                $transaksi->bayar,
                 $transaksi->user->name
             ];
         }
