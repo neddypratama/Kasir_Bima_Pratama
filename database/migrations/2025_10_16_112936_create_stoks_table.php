@@ -14,9 +14,9 @@ return new class extends Migration
         Schema::create('stoks', function (Blueprint $table) {
             $table->id();
             $table->string('invoice')->unique();
-            $table->foreignId('user_id')->constrained();
+            $table->foreignId('user_id')->constrained('users');
             $table->dateTime('tanggal');
-            $table->foreignId('barang_id')->constrained();
+            $table->foreignId('barang_id')->constrained('barangs');
             $table->decimal('tambah')->default(0);
             $table->decimal('kurang')->default(0);
             $table->decimal('kotor')->default(0);

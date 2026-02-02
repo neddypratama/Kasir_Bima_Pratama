@@ -153,7 +153,7 @@ new class extends Component {
             ->where('type', 'Kredit')
             ->where('status', 'Hutang')
             ->when($this->barang_id, function (Builder $q) {
-                $q->whereHas('clients', function ($q2) {
+                $q->whereHas('client', function ($q2) {
                     $q2->where('name', 'like', 'Kandang Kambing%');
                 });
             })

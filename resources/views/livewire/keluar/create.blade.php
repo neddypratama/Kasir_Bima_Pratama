@@ -125,6 +125,7 @@ new class extends Component {
                         <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
                             placeholder="Pilih Metode" />
                         <x-input label="Total Pengeluaran" wire:model.live="total" prefix="Rp " money="IDR" />
+                        <x-input label="No HP" wire:model="no_hp" ></x-input>
                     </div>
                 </div>
             </div>

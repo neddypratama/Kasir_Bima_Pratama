@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\Stok;
+use App\Models\StokBatch;
 use App\Models\Barang;
 use App\Models\Transaksi;
 use Livewire\Volt\Component;
@@ -65,14 +65,8 @@ new class extends Component {
 
     public function delete($id): void
     {
-        $stok = Stok::with('barang')->findOrFail($id);
+        $stok = StokBatch::with('barang')->findOrFail($id);
 
-        $barang = $stok->barang;
-        if ($barang) {
-            // kembalikan stok ke kondisi sebelum transaksi
-            $stok_awal = $barang->stok - $stok->tambah + ($stok->kurang + $stok->kotor + $stok->rusak);
-            $barang->update(['stok' => max(0, $stok_awal)]);
-        }
         $stok->delete();
 
         $this->warning("Stok $id berhasil dihapus", position: 'toast-top');
@@ -80,12 +74,12 @@ new class extends Component {
 
     public function headers(): array
     {
-        return [['key' => 'invoice', 'label' => 'Invoice', 'class' => 'w-36'], ['key' => 'barang.name', 'label' => 'Barang', 'class' => 'w-36'], ['key' => 'tanggal', 'label' => 'Tanggal', 'class' => 'w-24'], ['key' => 'tambah', 'label' => ' Tambah', 'class' => 'w-8'], ['key' => 'kurang', 'label' => ' Kurang', 'class' => 'w-8'], ['key' => 'kotor', 'label' => ' Return', 'class' => 'w-8'], ['key' => 'rusak', 'label' => ' Kadaluarsa', 'class' => 'w-8']];
+        return [['key' => 'tanggal', 'label' => 'Tanggal', 'class' => 'w-24'], ['key' => 'user.name', 'label' => 'User', 'class' => 'w-24'], ['key' => 'barang.name', 'label' => 'Barang', 'class' => 'w-36'], ['key' => 'harga', 'label' => ' HPP', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'qty_masuk', 'label' => ' Stok', 'class' => 'w-8'], ['key' => 'qty_sisa', 'label' => ' Sisa', 'class' => 'w-8']];
     }
 
     public function transaksi(): LengthAwarePaginator
     {
-        return Stok::query()
+        return StokBatch::query()
             ->with(['barang:id,name', 'user:id,name'])
             ->when($this->search, function (Builder $query) {
                 $query
@@ -144,11 +138,11 @@ new class extends Component {
 ?>
 
 <div class="p-4 space-y-6">
-    <x-header title="Perbaikan Stok" separator progress-indicator>
+    <x-header title="Penambahan Stok" separator progress-indicator>
         <x-slot:actions>
             <div class="flex flex-row sm:flex-row gap-2">
                 <x-button wire:click="openExportModal" icon="fas.download" primary>Export Excel</x-button>
-                <x-button label="Create" link="/stok/create" responsive icon="o-plus" class="btn-primary" />
+                <x-button label="Create" link="/penambahan-stok/create" responsive icon="o-plus" class="btn-primary" />
             </div>
         </x-slot:actions>
     </x-header>
@@ -169,20 +163,20 @@ new class extends Component {
     <!-- TABLE -->
     <x-card class="overflow-x-auto">
         <x-table :headers="$headers" :rows="$transaksi" :sort-by="$sortBy" with-pagination
-            link="stok/{id}/show?barang={barang.name}">
+            link="penambahan-stok/{id}/show?barang={barang.name}">
 
             @scope('actions', $transaksi)
                 <div class="flex">
+                    @if (Auth::user()->role_id == 1 ||
+                            (Carbon::parse($transaksi->tanggal)->isSameDay($this->today) && $transaksi->user_id == Auth::user()->id))
+                        <x-button icon="o-pencil"
+                            link="/penambahan-stok/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
+                            class="btn-ghost btn-sm text-yellow-500" />
+                    @endif
                     @if (Auth::user()->role_id == 1)
                         <x-button icon="o-trash" wire:click="delete({{ $transaksi->id }})"
                             wire:confirm="Yakin ingin menghapus transaksi {{ $transaksi->invoice }} ini?" spinner
                             class="btn-ghost btn-sm text-red-500" />
-                    @endif
-                    @if (Auth::user()->role_id == 1 ||
-                            (Carbon::parse($transaksi->tanggal)->isSameDay($this->today) && $transaksi->user_id == Auth::user()->id))
-                        <x-button icon="o-pencil"
-                            link="/stok/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
-                            class="btn-ghost btn-sm text-yellow-500" />
                     @endif
                 </div>
             @endscope

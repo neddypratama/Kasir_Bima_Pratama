@@ -98,11 +98,13 @@
                 @if (in_array(auth()->user()->role_id, [1, 2]))
                     <x-menu-sub title="Manage Stok" icon="fas.warehouse">
                         {{-- <x-menu-item title="Laporan Stok" icon="fas.file" link="/pakan" /> --}}
-                        <x-menu-item title="Stok" icon="fas.capsules" link="/stok" />
+                        <x-menu-item title="Perbaikan Stok" icon="fas.capsules" link="/stok" />
+                        <x-menu-item title="Penambahan Stok" icon="fas.capsules" link="/penambahan-stok" />
                     </x-menu-sub>
                 @endif
 
                 <x-menu-sub title="Manage Transaksi" icon="fas.basket-shopping">
+                    <x-menu-item title="Laporan" icon="fas.house" link="/laporan" />
                     @if (in_array(auth()->user()->role_id, [1, 4]))
                         <x-menu-item title="Bon Kandang" icon="fas.house" link="/bon-kandang" />
                     @endif

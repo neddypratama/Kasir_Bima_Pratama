@@ -13,8 +13,9 @@ return new class extends Migration
     {
         Schema::create('stok_batches', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('barang_id')->constrained();
-            $table->foreignId('detail_transaksi_id')->constrained();
+            $table->foreignId('user_id')->constrained('users');
+            $table->foreignId('barang_id')->constrained('barangs');
+            $table->foreignId('detail_transaksi_id')->nullable()->constrained('detail_transaksis');
             $table->decimal('qty_masuk', 10, 2);
             $table->decimal('qty_sisa', 10, 2);
             $table->decimal('harga', 15, 2);

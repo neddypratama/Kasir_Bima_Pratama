@@ -10,7 +10,7 @@ new class extends Component {
     {
         $this->barang = $barang->load([
             'jenis',
-            'satuans', // relasi konversi satuan
+            'stokBatches', // relasi konversi satuan
         ]);
     }
 };
@@ -38,7 +38,7 @@ new class extends Component {
                 <div>
                     <p class="mb-3">Stok</p>
                     <p class="font-semibold">
-                        {{ $barang->stok }}
+                        {{ $barang->stokBatches->sum('qty_sisa') ?? 0 }} Unit
                     </p>
                 </div>
             </div>
@@ -52,7 +52,7 @@ new class extends Component {
                 <div>
                     <p class="mb-3">HPP</p>
                     <p class="font-semibold">
-                        Rp {{ number_format($barang->hpp ?? 0, 0, ',', '.') }}
+                        Rp {{ number_format($barang->stokBatches->latest('harga') ?? 0, 0, ',', '.') }}
                     </p>
                 </div>
 

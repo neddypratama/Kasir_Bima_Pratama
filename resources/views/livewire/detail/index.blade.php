@@ -26,16 +26,24 @@ new class extends Component {
 
     public int $perPage = 25; // Default jumlah data per halaman
 
+    public array $types = [
+        ['id' => 'Pendapatan', 'name' => 'Pendapatan'],
+        ['id' => 'Pengeluaran', 'name' => 'Pengeluaran'],
+        ['id' => 'Aset', 'name' => 'Aset'],
+    ];
+
     public bool $editModal = false; // Untuk menampilkan modal
 
     public ?Laporan $editingRole = null; // Menyimpan data role yang sedang diedit
 
     public string $editingName = '';
+    public string $editingType = '';
     public string $editingDeskripsi = ''; // Menyimpan nilai input untuk nama role
 
     public bool $createModal = false; // Untuk menampilkan modal create
 
     public string $newRoleName = '';
+    public string $newRoleType = '';
     public string $newRoleDeskripsi = ''; // Untuk menyimpan input nama role baru
 
     // Clear filters
@@ -57,6 +65,7 @@ new class extends Component {
     public function create(): void
     {
         $this->newRoleName = ''; // Reset input sebelum membuka modal
+        $this->newRoleType = '';
         $this->newRoleDeskripsi = '';
         $this->createModal = true;
     }
@@ -65,11 +74,11 @@ new class extends Component {
     {
         $this->validate([
             'newRoleName' => 'required|string|max:255',
+            'newRoleType' => 'required',
             'newRoleDeskripsi' => 'nullable',
         ]);
 
-        Laporan::create(['name' => $this->newRoleName, 'deskripsi' => $this->newRoleDeskripsi]);
-
+        Laporan::create(['name' => $this->newRoleName, 'type' => $this->newRoleType, 'deskripsi' => $this->newRoleDeskripsi]);
         $this->createModal = false;
         $this->success('Laporan created successfully.', position: 'toast-top');
     }
@@ -81,6 +90,7 @@ new class extends Component {
         if ($this->editingRole) {
             
             $this->editingName = $this->editingRole->name;
+            $this->editingType = $this->editingRole->type;
             $this->editingDeskripsi = $this->editingRole->deskripsi;
             $this->editModal = true; // Tampilkan modal
         }
@@ -91,10 +101,11 @@ new class extends Component {
         if ($this->editingRole) {
             $this->validate([
                 'editingName' => 'required|string|max:255',
+                'editingType' => 'required',
                 'editingDeskripsi' => 'nullable',
             ]);
 
-            $this->editingRole->update(['name' => $this->editingName, 'deskripsi' => $this->editingDeskripsi, 'updated_at' => now()]);
+            $this->editingRole->update(['name' => $this->editingName, 'type' => $this->editingType, 'deskripsi' => $this->editingDeskripsi, 'updated_at' => now()]);
             $this->editModal = false;
             $this->success('Laporan updated successfully.', position: 'toast-top');
         }
@@ -106,9 +117,9 @@ new class extends Component {
         return [
             ['key' => 'id', 'label' => '#'],
             ['key' => 'name', 'label' => 'Name', 'class' => 'w-64'],
+            ['key' => 'type', 'label' => 'Type', 'class' => 'w-30'],
             ['key' => 'deskripsi', 'label' => 'Deskripsi', 'class' => 'w-100'],
             ['key' => 'kategoris_count', 'label' => 'Kategori', 'class' => 'w-64'], // Gunakan `users_count`
-            // ['key' => 'created_at', 'label' => 'Tanggal dibuat', 'class' => 'w-30'],
         ];
     }
 
@@ -131,6 +142,7 @@ new class extends Component {
             }
         }
         return [
+            'types' => $this->types,
             'roles' => $this->roles(),
             'headers' => $this->headers(),
             'perPage' => $this->perPage,
@@ -187,6 +199,7 @@ new class extends Component {
     <x-modal wire:model="createModal" title="Create Laporan">
         <div class="grid gap-4">
             <x-input label="Laporan Name" wire:model.live="newRoleName" />
+            <x-select label="Laporan Type" wire:model.live="newRoleType" :options="$types" placeholder="Pilih Type" />
             <x-textarea label="Laporan Deskripsi" wire:model.live="newRoleDeskripsi" placeholder="Here ..." />
         </div>
 
@@ -199,6 +212,7 @@ new class extends Component {
     <x-modal wire:model="editModal" title="Edit Laporan">
         <div class="grid gap-4">
             <x-input label="Laporan Name" wire:model.live="editingName" />
+            <x-select label="Laporan Type" wire:model.live="editingType" :options="$types" placeholder="Pilih Type" />
             <x-textarea label="Laporan Deskripsi" wire:model.live="editingDeskripsi" placeholder="Here ..." />
         </div>
 

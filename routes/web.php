@@ -74,6 +74,12 @@ Route::middleware('auth')->group(function () {
         Volt::route('/stok/create', 'stok.create');
         Volt::route('/stok/{stok}/edit', 'stok.edit');
         Volt::route('/stok/{stok}/show', 'stok.show');
+
+        // Stok
+        Volt::route('/penambahan-stok', 'penambahan-stok.index');
+        Volt::route('/penambahan-stok/create', 'penambahan-stok.create');
+        Volt::route('/penambahan-stok/{batch}/edit', 'penambahan-stok.edit');
+        Volt::route('/penambahan-stok/{batch}/show', 'penambahan-stok.show');
 });
 
     /*
@@ -83,7 +89,9 @@ Route::middleware('auth')->group(function () {
     */
     Route::middleware('role:1,3')->group(function () {
         // Pakan
-        // Volt::route('/laporan-penjualan', 'pakan.index');
+        Volt::route('/laporan', 'pakan.index');
+
+
         Volt::route('/kasir', 'kasir.index');
         Volt::route('/kasir/create', 'kasir.create');
         Volt::route('/kasir/{transaksi}/edit', 'kasir.edit');

@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('jenis_id')->constrained('jenis_barangs');
             $table->string('name');
-            $table->decimal('stok');
-            $table->decimal('hpp');
+            // $table->decimal('stok');
+            // $table->decimal('hpp');
             $table->string('harga_eceran')->nullable();
             $table->decimal('harga_sak');
             $table->timestamps();

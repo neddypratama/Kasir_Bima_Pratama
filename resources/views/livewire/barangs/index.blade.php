@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\StokBatch;
 use App\Models\Barang;
 use App\Models\JenisBarang;
 use Livewire\Volt\Component;
@@ -55,12 +56,53 @@ new class extends Component {
     // Table headers
     public function headers(): array
     {
-        return [['key' => 'id', 'label' => '#', 'class' => 'w-1'], ['key' => 'jenis_name', 'label' => 'Jenis Barang'], ['key' => 'name', 'label' => 'Name'], ['key' => 'stok', 'label' => 'Stok'], ['key' => 'hpp', 'label' => 'Harga Pokok', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'harga_eceran', 'label' => 'Harga Eceran', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']], ['key' => 'harga_sak', 'label' => 'Harga Partai', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']]];
+        return [
+            ['key' => 'id', 'label' => '#', 'class' => 'w-1'],
+            ['key' => 'jenis_name', 'label' => 'Jenis Barang'],
+            ['key' => 'name', 'label' => 'Name'],
+            ['key' => 'stok', 'label' => 'Stok'],
+            [
+                'key' => 'hpp',
+                'label' => 'Harga Pokok',
+                'class' => 'w-24',
+                'format' => ['currency', 0, 'Rp'],
+            ],
+            [
+                'key' => 'harga_eceran',
+                'label' => 'Harga Eceran',
+                'class' => 'w-24',
+                'format' => ['currency', 0, 'Rp'],
+            ],
+            [
+                'key' => 'harga_sak',
+                'label' => 'Harga Partai',
+                'class' => 'w-24',
+                'format' => ['currency', 0, 'Rp'],
+            ],
+        ];
     }
 
     public function barangs(): LengthAwarePaginator
     {
-        return Barang::query()->withAggregate('jenis', 'name')->when($this->search, fn(Builder $q) => $q->where('name', 'like', "%$this->search%"))->when($this->jenis_id, fn(Builder $q) => $q->where('jenis_id', $this->jenis_id))->orderBy(...array_values($this->sortBy))->paginate($this->perPage);
+        return Barang::query()
+            ->withAggregate('jenis', 'name')
+
+            // 🔹 STOK = SUM(qty_sisa)
+            ->selectSub(StokBatch::query()->selectRaw('COALESCE(SUM(qty_sisa), 0)')->whereColumn('stok_batches.barang_id', 'barangs.id'), 'stok')
+
+            // 🔹 HPP = harga batch TERBARU
+            ->selectSub(StokBatch::query()->select('harga')->whereColumn('stok_batches.barang_id', 'barangs.id')->orderByDesc('tanggal')->limit(1), 'hpp')
+
+            // 🔍 SEARCH
+            ->when($this->search, fn(Builder $q) => $q->where('barangs.name', 'like', "%{$this->search}%"))
+
+            // 🔍 FILTER JENIS
+            ->when($this->jenis_id, fn(Builder $q) => $q->where('jenis_id', $this->jenis_id))
+
+            // 🔃 SORT (AMAN)
+            ->orderBy($this->sortBy['column'], $this->sortBy['direction'])
+
+            ->paginate($this->perPage);
     }
 
     public function with(): array

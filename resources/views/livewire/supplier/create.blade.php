@@ -5,6 +5,7 @@ use App\Models\Kategori;
 use App\Models\Transaksi;
 use App\Models\DetailTransaksi;
 use App\Models\Barang;
+use App\Models\StokBatch;
 use App\Models\Client;
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
@@ -55,7 +56,7 @@ new class extends Component {
     public function mount(): void
     {
         $this->user_id = auth()->id();
-        $this->tanggal = now()->format('Y-m-d\TH:i');
+        $this->tanggal = now()->format('Y-m-d\TH:i:s');
         $this->updatedTanggal($this->tanggal);
 
         $this->barangs = Barang::all();
@@ -105,64 +106,64 @@ new class extends Component {
     public function save(): void
     {
         $this->validate([
-            'client_id' => 'required',
             'details' => 'required|array|min:1',
             'details.*.barang_id' => 'required|exists:barangs,id',
             'details.*.satuan' => 'required',
             'details.*.kuantitas' => 'required|numeric|min:1',
+            'details.*.value' => 'required|numeric|min:0',
         ]);
 
-        $status = $this->uang >= $this->total ? 'Lunas' : 'Hutang';
+        DB::transaction(function () {
+            $status = $this->uang >= $this->total ? 'Lunas' : 'Hutang';
 
-        $kasir = Transaksi::create([
-            'invoice' => $this->invoice,
-            'user_id' => $this->user_id,
-            'tanggal' => $this->tanggal,
-            'client_id' => $this->client_id,
-            'type' => 'Stok',
-            'total' => $this->total,
-            'status' => $status,
-            'uang' => $this->uang,
-            'bayar' => $this->bayar,
-            'kembalian' => max(0, $this->total - $this->uang),
-        ]);
-
-        foreach ($this->details as $item) {
-            $barang = Barang::find($item['barang_id']);
-            $kategori = Kategori::where('name', 'like', 'Stok %' . $barang->jenis->name)->first();
-
-            DetailTransaksi::create([
-                'transaksi_id' => $kasir->id,
-                'barang_id' => $barang->id,
-                'kategori_id' => $kategori->id,
-                'value' => $item['value'],
-                'kuantitas' => $item['kuantitas'],
-                'sub_total' => $item['value'] * $item['kuantitas'],
+            /** =========================
+             * TRANSAKSI PEMBELIAN
+             ========================== */
+            $transaksi = Transaksi::create([
+                'invoice' => $this->invoice,
+                'user_id' => $this->user_id,
+                'tanggal' => $this->tanggal,
+                'client_id' => $this->client_id,
+                'type' => 'Stok',
+                'total' => $this->total,
+                'status' => $status,
+                'uang' => $this->uang,
+                'bayar' => $this->bayar,
+                'kembalian' => max(0, $this->uang - $this->total),
             ]);
 
-            $barang->increment('stok', $item['kuantitas']);
-        }
+            /** =========================
+             * DETAIL + STOK BATCH FIFO
+             ========================== */
+            foreach ($this->details as $item) {
+                $barang = Barang::findOrFail($item['barang_id']);
 
-        $barangIds = collect($this->details)->pluck('barang_id')->unique();
+                $kategori = Kategori::where('name', 'like', 'Stok %' . $barang->jenis->name)->firstOrFail();
 
-        foreach ($barangIds as $id) {
-            $barang = Barang::find($id);
-            if (!$barang) {
-                continue;
+                // detail transaksi
+                
+                $detail = DetailTransaksi::create([
+                    'transaksi_id' => $transaksi->id,
+                    'barang_id' => $barang->id,
+                    'kategori_id' => $kategori->id,
+                    'value' => $item['value'], // harga beli
+                    'kuantitas' => $item['kuantitas'],
+                    'sub_total' => $item['value'] * $item['kuantitas'],
+                ]);
+
+                // 🔥 INI KUNCI FIFO
+                StokBatch::create([
+                    'barang_id' => $barang->id,
+                    'detail_transaksi_id' => $detail->id,
+                    'tanggal' => $this->tanggal,
+                    'qty_masuk' => $item['kuantitas'],
+                    'qty_sisa' => $item['kuantitas'],
+                    'harga' => $item['value'], // HPP batch
+                ]);
             }
+        });
 
-            $data = DetailTransaksi::where('barang_id', $barang->id)->whereHas('transaksi', fn($q) => $q->where('type', 'Stok'))->selectRaw('SUM(kuantitas) as total_kuantitas, SUM(value * kuantitas) as total_harga')->first();
-
-            $stokDebit = $data->total_kuantitas ?? 0;
-            $totalHarga = $data->total_harga ?? 0;
-            $hppBaru = $stokDebit > 0 ? $totalHarga / $stokDebit : 0;
-
-            $barang->update([
-                'hpp' => $hppBaru,
-            ]);
-        }
-
-        $this->success('Transaksi berhasil dibuat!', redirectTo: '/supplier');
+        $this->success('Transaksi pembelian berhasil disimpan (FIFO)', redirectTo: '/supplier');
     }
 
     public function addDetail(): void

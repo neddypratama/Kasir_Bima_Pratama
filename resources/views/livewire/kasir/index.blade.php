@@ -1,7 +1,7 @@
 <?php
 
 use App\Models\Transaksi;
-use App\Models\TransaksiLink;
+use App\Models\StokBatch;
 use App\Models\DetailTransaksi;
 use App\Models\Barang;
 use App\Models\Client;
@@ -123,12 +123,13 @@ new class extends Component {
         $hpp->details()->delete();
         $hpp->delete();
 
-        // 🔄 KEMBALIKAN STOK BARANG
         foreach ($transaksi->details as $detail) {
-            $barang = Barang::find($detail->barang_id);
+            // rollback stok batch
+            $batch = StokBatch::where('detail_transaksi_id', $detail->id)->first();
 
-            if ($barang) {
-                $barang->increment('stok', $detail->kuantitas);
+            if ($batch) {
+                // kembalikan sisa ke nol (karena batch akan dihapus)
+                $batch->increment('qty_sisa', $$detail->kuantitas);
             }
         }
 

@@ -1,7 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori};
+use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori, StokBatch};
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
@@ -104,70 +104,71 @@ new class extends Component {
     {
         $this->validate([
             'client_id' => 'required',
-            'details.*.barang_id' => 'required',
+            'details.*.barang_id' => 'required|exists:barangs,id',
             'details.*.satuan' => 'required',
-            'details.*.kuantitas' => 'required|min:1',
-            'details.*.value' => 'required|min:1',
+            'details.*.kuantitas' => 'required|numeric|min:0.01',
+            'details.*.value' => 'required|numeric|min:1',
         ]);
 
-        $status = $this->uang >= $this->total ? 'Lunas' : 'Hutang';
+        \DB::transaction(function () {
+            $status = $this->uang >= $this->total ? 'Lunas' : 'Hutang';
+            /* ===============================
+                1. ROLLBACK STOK BATCH LAMA
+            =============================== */
+            foreach ($this->transaksi->details as $detail) {
+                // rollback stok batch
+                $batch = StokBatch::where('detail_transaksi_id', $detail->id)->first();
 
-        /* =====================
-            ROLLBACK STOK LAMA
-        ====================== */
-        foreach ($this->transaksi->details as $detail) {
-            $detail->barang->decrement('stok', $detail->kuantitas);
-        }
-
-        // hapus detail lama
-        DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
-
-        $this->transaksi->update([
-            'client_id' => $this->client_id,
-            'total' => $this->total,
-            'uang' => $this->uang,
-            'bayar' => $this->bayar,
-            'status' => $status,
-            'kembalian' => max(0, $this->uang - $this->total),
-        ]);
-
-        /* =====================
-            SIMPAN DETAIL BARU
-        ====================== */
-        foreach ($this->details as $item) {
-            $barang = Barang::find($item['barang_id']);
-            $kategori = Kategori::where('name', 'like', 'Stok %' . $barang->jenis->name)->first();
-
-            DetailTransaksi::create([
-                'transaksi_id' => $this->transaksi->id,
-                'barang_id' => $barang->id,
-                'kategori_id' => $kategori->id,
-                'value' => $item['value'],
-                'kuantitas' => $item['kuantitas'],
-                'sub_total' => $item['value'] * $item['kuantitas'],
-            ]);
-
-            $barang->increment('stok', $item['kuantitas']);
-        }
-
-        $barangIds = collect($this->details)->pluck('barang_id')->unique();
-
-        foreach ($barangIds as $id) {
-            $barang = Barang::find($id);
-            if (!$barang) {
-                continue;
+                if ($batch) {
+                    // kembalikan sisa ke nol (karena batch akan dihapus)
+                    $batch->delete();
+                }
             }
 
-            $data = DetailTransaksi::where('barang_id', $barang->id)->whereHas('transaksi', fn($q) => $q->where('type', 'Stok'))->selectRaw('SUM(kuantitas) as total_kuantitas, SUM(value * kuantitas) as total_harga')->first();
+            // hapus detail lama
+            DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
 
-            $stokDebit = $data->total_kuantitas ?? 0;
-            $totalHarga = $data->total_harga ?? 0;
-            $hppBaru = $stokDebit > 0 ? $totalHarga / $stokDebit : 0;
-
-            $barang->update([
-                'hpp' => $hppBaru,
+            /* ===============================
+                2. UPDATE TRANSAKSI HEADER
+            =============================== */
+            $this->transaksi->update([
+                'client_id' => $this->client_id,
+                'total' => $this->total,
+                'uang' => $this->uang,
+                'bayar' => $this->bayar,
+                'status' => $status,
+                'kembalian' => max(0, $this->uang - $this->total),
             ]);
-        }
+
+            /* ===============================
+                3. SIMPAN DETAIL + BATCH BARU
+            =============================== */
+            foreach ($this->details as $item) {
+                $barang = Barang::findOrFail($item['barang_id']);
+
+                $kategori = Kategori::where('name', 'like', 'Stok %' . $barang->jenis->name)->first();
+
+                // simpan detail transaksi
+                $detail = DetailTransaksi::create([
+                    'transaksi_id' => $this->transaksi->id,
+                    'barang_id' => $barang->id,
+                    'kategori_id' => $kategori->id,
+                    'value' => $item['value'],
+                    'kuantitas' => $item['kuantitas'],
+                    'sub_total' => $item['value'] * $item['kuantitas'],
+                ]);
+
+                // buat stok batch FIFO
+                StokBatch::create([
+                    'barang_id' => $barang->id,
+                    'detail_transaksi_id' => $detail->id,
+                    'qty_masuk' => $item['kuantitas'],
+                    'qty_sisa' => $item['kuantitas'],
+                    'harga' => $item['value'],
+                    'tanggal' => $this->tanggal,
+                ]);
+            }
+        });
 
         $this->success('Transaksi berhasil diperbarui', redirectTo: '/supplier');
     }
