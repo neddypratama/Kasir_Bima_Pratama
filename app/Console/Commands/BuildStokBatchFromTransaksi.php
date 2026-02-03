@@ -32,6 +32,7 @@ class BuildStokBatchFromTransaksi extends Command
 
                 StokBatch::create([
                     'barang_id' => $detail->barang_id,
+                    'user_id' => 1,
                     'detail_transaksi_id' => $detail->id,
                     'qty_masuk' => $detail->kuantitas,
                     'qty_sisa' => $detail->kuantitas,

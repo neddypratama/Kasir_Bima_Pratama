@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\JenisBarang;
 use App\Models\Kategori;
 use App\Models\Barang;
+use App\Models\StokBatch;
 use Livewire\Volt\Component;
 use Mary\Traits\Toast;
 use Carbon\Carbon;
@@ -309,15 +310,28 @@ new class extends Component {
             return [];
         }
 
-        $barangs = Barang::select('id', 'name', 'stok')->where('stok', '>', 0)->whereIn('jenis_id', $jenisIds)->get();
+        $barangs = StokBatch::query()
+            ->selectRaw('barang_id, SUM(qty_sisa) as total_stok')
+            ->where('qty_sisa', '>', 0)
+            ->whereHas('barang', function ($q) use ($jenisIds) {
+                $q->whereIn('jenis_id', $jenisIds);
+            })
+            ->groupBy('barang_id')
+            ->with('barang:id,name')
+            ->get();
 
         if ($barangs->isEmpty()) {
             return [];
         }
 
-        $grouped = $barangs->groupBy(fn($b) => $b->name);
-        $data = $grouped->map(fn($items) => $items->sum('stok'))->toArray();
-
+        // 🔹 Bentuk data: [nama_barang => total_stok]
+        $data = $barangs
+            ->mapWithKeys(
+                fn($row) => [
+                    $row->barang->name => (int) $row->total_stok,
+                ],
+            )
+            ->toArray();
         $colors = collect($data)->map(fn() => sprintf('#%06X', mt_rand(0, 0xffffff)))->values()->toArray();
 
         return [
@@ -355,18 +369,32 @@ new class extends Component {
             return [];
         }
 
-        $barangs = Barang::select('id', 'name', 'stok')->where('stok', '>', 0)->whereIn('jenis_id', $jenisIds)->get();
+        // 🔹 Ambil stok dari stok_batches, bukan dari barang
+        $stokPerBarang = StokBatch::query()
+            ->selectRaw('barang_id, SUM(qty_sisa) as total_stok')
+            ->where('qty_sisa', '>', 0)
+            ->whereHas('barang', function ($q) use ($jenisIds) {
+                $q->whereIn('jenis_id', $jenisIds);
+            })
+            ->groupBy('barang_id')
+            ->with('barang:id,name')
+            ->get();
 
-        if ($barangs->isEmpty()) {
+        if ($stokPerBarang->isEmpty()) {
             return [];
         }
 
-        $grouped = $barangs->groupBy(fn($b) => $b->name);
-        $data = $grouped->map(fn($items) => $items->sum('stok'))->toArray();
+        // 🔹 Bentuk data: [nama_barang => total_stok]
+        $data = $stokPerBarang
+            ->mapWithKeys(
+                fn($row) => [
+                    $row->barang->name => (int) $row->total_stok,
+                ],
+            )
+            ->toArray();
 
+        // 🔹 Warna random
         $colors = collect($data)->map(fn() => sprintf('#%06X', mt_rand(0, 0xffffff)))->values()->toArray();
-
-        $labels = array_keys($data);
 
         // 🟢 Perbaikan bagian label — setiap barang jadi satu dataset sendiri
         $datasets = [];
@@ -468,7 +496,7 @@ new class extends Component {
 
     public function minimumStok(): int
     {
-        return Barang::where('stok', '<=', 5)
+        return StokBatch::where('qty_sisa', '<=', 5)
             ->whereBetween('created_at', [Carbon::parse($this->startDate)->startOfDay(), Carbon::parse($this->endDate)->endOfDay()])
             ->count();
     }

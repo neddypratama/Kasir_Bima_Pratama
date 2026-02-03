@@ -8,6 +8,7 @@ class StokBatch extends Model
 {
     protected $fillable = [
         'barang_id',
+        'user_id',
         'detail_transaksi_id',
         'tanggal',
         'qty_masuk',
@@ -23,5 +24,10 @@ class StokBatch extends Model
     public function barang()
     {
         return $this->belongsTo(Barang::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
 }
