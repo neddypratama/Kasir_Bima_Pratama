@@ -16,6 +16,7 @@ new class extends Component {
     public array $bonData = [];
     public array $hutangData = [];
     public array $stokData = [];
+
     public array $expanded = [];
 
     /* ======================
@@ -183,14 +184,15 @@ new class extends Component {
     public function with(): array
     {
         $totalPendapatan = array_sum(array_column($this->bonData, 'total'));
-        $totalPengeluaran = array_sum(array_column($this->hutangData, 'total'));
+        $totalPengeluaran = array_sum(array_column($this->stokData, 'total'));
+        $totalHutang = array_sum(array_column($this->hutangData, 'total'));
 
         return [
             'bonData' => $this->bonData,
             'hutangData' => $this->hutangData,
-            'totalPendapatan' => $totalPendapatan,
-            'totalPengeluaran' => $totalPengeluaran,
-            'totalModal' => $totalPendapatan - $totalPengeluaran,
+            'totalPendapatan' => $totalPendapatan + $totalPengeluaran,
+            'totalPengeluaran' => $totalHutang,
+            'totalModal' => $totalPendapatan + $totalPengeluaran - $totalHutang,
         ];
     }
 };

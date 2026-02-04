@@ -1,7 +1,7 @@
 <?php
 
 use Livewire\Volt\Component;
-use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori};
+use App\Models\{Barang, Client, Transaksi, DetailTransaksi, Kategori, StokBatch};
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
@@ -126,61 +126,116 @@ new class extends Component {
             'details.*.kuantitas' => 'required|min:1',
         ]);
 
-        /* =====================
-            ROLLBACK STOK LAMA
-        ====================== */
-        foreach ($this->transaksi->details as $detail) {
-            $detail->barang->increment('stok', $detail->kuantitas);
-        }
+        DB::transaction(function () {
+            /** =========================
+             * 1. ROLLBACK FIFO LAMA
+             ========================== */
+            foreach ($this->hpp->details as $detail) {
+                $qty = $detail->kuantitas;
 
-        // hapus detail lama
-        DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
-        DetailTransaksi::where('transaksi_id', $this->hpp->id)->delete();
+                $batches = StokBatch::where('barang_id', $detail->barang_id)->orderBy('tanggal')->orderBy('id')->get();
 
-        $this->transaksi->update([
-            'client_id' => $this->client_id,
-            'bayar' => $this->bayar,
-            'total' => $this->total,
-            'status' => 'Hutang',
-        ]);
+                // dd($batches->first());
+                foreach ($batches as $batch) {
+                    if ($qty <= 0) {
+                        break;
+                    }
 
-        $totalHPP = 0;
+                    $restore = min($qty, $batch->qty_masuk - $batch->qty_sisa);
 
-        /* =====================
+                    if ($restore > 0) {
+                        $batch->increment('qty_sisa', $restore);
+                        $qty -= $restore;
+                    }
+                }
+            }
+
+            // hapus detail lama
+            DetailTransaksi::where('transaksi_id', $this->transaksi->id)->delete();
+            DetailTransaksi::where('transaksi_id', $this->hpp->id)->delete();
+
+            $this->transaksi->update([
+                'client_id' => $this->client_id,
+                'bayar' => $this->bayar,
+                'total' => $this->total,
+                'status' => 'Hutang',
+            ]);
+
+            $totalHPP = 0;
+
+            /* =====================
             SIMPAN DETAIL BARU
         ====================== */
-        foreach ($this->details as $item) {
-            $barang = Barang::find($item['barang_id']);
-            $kategori = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
+            foreach ($this->details as $item) {
+                $barang = Barang::find($item['barang_id']);
+                $qtyJual = $item['kuantitas'];
 
-            DetailTransaksi::create([
-                'transaksi_id' => $this->transaksi->id,
-                'barang_id' => $barang->id,
-                'kategori_id' => $kategori->id,
-                'value' => $item['value'],
-                'kuantitas' => $item['kuantitas'],
-                'sub_total' => $item['value'] * $item['kuantitas'],
-            ]);
+                // DETAIL PENJUALAN
+                $kategoriJual = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
 
-            $barang->decrement('stok', $item['kuantitas']);
-            $totalHPP += $barang->hpp * $item['kuantitas'];
-        }
+                DetailTransaksi::create([
+                    'transaksi_id' => $this->transaksi->id,
+                    'barang_id' => $barang->id,
+                    'kategori_id' => $kategoriJual->id,
+                    'value' => $item['value'],
+                    'kuantitas' => $qtyJual,
+                    'sub_total' => $item['value'] * $qtyJual,
+                ]);
 
-        $this->hpp->update(['total' => $totalHPP, 'client_id' => $this->client_id, 'bayar' => $this->bayar]);
+                /** =========================
+                 * FIFO HPP BARU
+                 ========================== */
+                $hppBarang = 0;
+                $sisa = $qtyJual;
 
-        foreach ($this->details as $item) {
-            $barang = Barang::find($item['barang_id']);
-            $kategori = Kategori::where('name', 'like', 'HPP %' . $barang->jenis->name)->first();
+                $batches = StokBatch::where('barang_id', $barang->id)->where('qty_sisa', '>', 0)->orderBy('tanggal')->orderBy('id')->lockForUpdate()->get();
 
-            DetailTransaksi::create([
-                'transaksi_id' => $this->hpp->id,
-                'barang_id' => $barang->id,
-                'kategori_id' => $kategori->id,
-                'value' => $barang->hpp,
-                'kuantitas' => $item['kuantitas'],
-                'sub_total' => $barang->hpp * $item['kuantitas'],
-            ]);
-        }
+                foreach ($batches as $batch) {
+                    if ($sisa <= 0) {
+                        break;
+                    }
+
+                    $pakai = min($batch->qty_sisa, $sisa);
+
+                    $hppBatch = $pakai * $batch->harga;
+
+                    $hppBarang += $hppBatch;
+                    $totalHPP += $hppBatch;
+
+                    $batch->decrement('qty_sisa', $pakai);
+                    $sisa -= $pakai;
+                }
+
+                if ($sisa > 0) {
+                    throw new \Exception("Stok FIFO {$barang->name} tidak mencukupi");
+                }
+
+                $hppPerBarang[$barang->id] = [
+                    'qty' => $qtyJual,
+                    'total' => $hppBarang,
+                ];
+            }
+
+            $this->hpp->update(['total' => $totalHPP, 'client_id' => $this->client_id, 'bayar' => $this->bayar]);
+
+            /** =========================
+             * 6. DETAIL HPP BARU
+             ========================== */
+            foreach ($hppPerBarang as $barangId => $data) {
+                $barang = Barang::find($barangId);
+
+                $kategoriHpp = Kategori::where('name', 'like', 'HPP %' . $barang->jenis->name)->first();
+
+                DetailTransaksi::create([
+                    'transaksi_id' => $this->hpp->id,
+                    'barang_id' => $barang->id,
+                    'kategori_id' => $kategoriHpp->id,
+                    'value' => $data['total'] / $data['qty'], // FIFO UNIT COST
+                    'kuantitas' => $data['qty'],
+                    'sub_total' => $data['total'],
+                ]);
+            }
+        });
 
         $this->success('Transaksi berhasil diperbarui', redirectTo: '/bon-kandang');
     }
@@ -227,21 +282,12 @@ new class extends Component {
                                     <x-choices-offline placeholder="Pilih Barang"
                                         wire:model.live="details.{{ $index }}.barang_id" :options="$barangs" single
                                         searchable clearable label="Barang">
-                                        {{-- Tampilan item di dropdown --}} @scope('item', $barangs)
-                                            <x-list-item :item="$barangs">
-                                            </x-list-item>
-                                        @endscope
-
-                                        {{-- Tampilan ketika sudah dipilih --}}
-                                        @scope('selection', $barangs)
-                                            {{ $barangs->name }}
-                                        @endscope
                                     </x-choices-offline>
                                 </div>
                                 <x-input label="Satuan" placeholder="Kg" readonly />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
-                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
+                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="0.01"
                                     step="0.01" wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"

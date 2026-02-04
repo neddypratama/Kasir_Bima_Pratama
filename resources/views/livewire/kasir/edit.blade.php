@@ -108,7 +108,7 @@ new class extends Component {
 
             if ($barang) {
                 $this->details[$index]['max_qty'] = $stok;
-                $this->details[$index]['kuantitas'] = 1;
+                $this->details[$index]['kuantitas'] = 0.01;
 
                 if ($this->details[$index]['satuan'] == 'Eceran') {
                     $this->details[$index]['value'] = $barang->harga_eceran;
@@ -155,7 +155,7 @@ new class extends Component {
             'client_id' => 'required',
             'details.*.barang_id' => 'required',
             'details.*.satuan' => 'required',
-            'details.*.kuantitas' => 'required|min:1',
+            'details.*.kuantitas' => 'required|min:0.01',
         ]);
 
         DB::transaction(function () {
@@ -333,22 +333,13 @@ new class extends Component {
                                     <x-choices-offline placeholder="Pilih Barang"
                                         wire:model.live="details.{{ $index }}.barang_id" :options="$barangs" single
                                         searchable clearable label="Barang">
-                                        {{-- Tampilan item di dropdown --}} @scope('item', $barangs)
-                                            <x-list-item :item="$barangs">
-                                            </x-list-item>
-                                        @endscope
-
-                                        {{-- Tampilan ketika sudah dipilih --}}
-                                        @scope('selection', $barangs)
-                                            {{ $barangs->name }}
-                                        @endscope
                                     </x-choices-offline>
                                 </div>
                                 <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
                                     :options="$satuan" placeholder="Pilih Satuan" />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
-                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
+                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="0.01"
                                     step="0.01" wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"

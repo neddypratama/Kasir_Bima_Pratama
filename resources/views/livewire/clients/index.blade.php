@@ -164,7 +164,7 @@ new class extends Component {
     <x-header title="Daftar Klien" separator progress-indicator>
         <x-slot:actions>
             <div class="flex flex-row sm:flex-row gap-2">
-                <x-button wire:click="export" icon="fas.download" primary>Export Excel</x-button>
+                {{-- <x-button wire:click="export" icon="fas.download" primary>Export Excel</x-button> --}}
                 <x-button label="Create" @click="$wire.create()" responsive icon="o-plus" class="btn-primary" />
             </div>
         </x-slot:actions>

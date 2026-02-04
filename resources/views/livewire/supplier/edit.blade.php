@@ -159,14 +159,14 @@ new class extends Component {
                 ]);
 
                 // buat stok batch FIFO
-                StokBatch::create([
-                    'barang_id' => $barang->id,
-                    'detail_transaksi_id' => $detail->id,
-                    'qty_masuk' => $item['kuantitas'],
-                    'qty_sisa' => $item['kuantitas'],
-                    'harga' => $item['value'],
-                    'tanggal' => $this->tanggal,
-                ]);
+                // StokBatch::create([
+                //     'barang_id' => $barang->id,
+                //     'detail_transaksi_id' => $detail->id,
+                //     'qty_masuk' => $item['kuantitas'],
+                //     'qty_sisa' => $item['kuantitas'],
+                //     'harga' => $item['value'],
+                //     'tanggal' => $this->tanggal,
+                // ]);
             }
         });
 
@@ -215,21 +215,12 @@ new class extends Component {
                                     <x-choices-offline placeholder="Pilih Barang"
                                         wire:model.live="details.{{ $index }}.barang_id" :options="$barangs" single
                                         searchable clearable label="Barang">
-                                        {{-- Tampilan item di dropdown --}} @scope('item', $barangs)
-                                            <x-list-item :item="$barangs">
-                                            </x-list-item>
-                                        @endscope
-
-                                        {{-- Tampilan ketika sudah dipilih --}}
-                                        @scope('selection', $barangs)
-                                            {{ $barangs->name }}
-                                        @endscope
                                     </x-choices-offline>
                                 </div>
                                 <x-input label="Satuan" wire:model.live="details.{{ $index }}.satuan" readonly />
                                 <x-input label="Harga Beli" wire:model.live="details.{{ $index }}.value"
                                     prefix="Rp " money="IDR" />
-                                <x-input label="Qty" type="number" min="1" step="0.01"
+                                <x-input label="Qty" type="number" min="0.01" step="0.01"
                                     wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"

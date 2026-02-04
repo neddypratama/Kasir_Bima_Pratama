@@ -8,7 +8,7 @@ use Mary\Traits\Toast;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\WithPagination;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Exports\StokPakanExport;
+use App\Exports\StokPenambahanExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
 
@@ -60,7 +60,7 @@ new class extends Component {
         $this->exportModal = false;
         $this->success('Export dimulai...', position: 'toast-top');
 
-        return Excel::download(new StokPakanExport($this->startDate, $this->endDate), 'stok.xlsx');
+        return Excel::download(new StokPenambahanExport($this->startDate, $this->endDate), 'stok-batch.xlsx');
     }
 
     public function delete($id): void

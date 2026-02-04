@@ -60,7 +60,7 @@ class AsetExport implements
         $last  = Transaksi::orderByDesc('tanggal')->first();
 
         if (!$first || !$last) {
-            return [];
+            return $rows;
         }
 
         $start = $this->startDate
@@ -71,36 +71,61 @@ class AsetExport implements
             ? Carbon::parse($this->endDate)->endOfDay()
             : Carbon::parse($last->tanggal)->endOfDay();
 
+        /* ======================
+         * GENERATE DEFAULT LAPORAN
+         * ====================== */
+        $aset = [];
+        $liabilitas = [];
+        $liabilitas = [];
 
+        $laporans = DB::table('kategoris')->get();
+
+        foreach ($laporans as $lap) {
+            if (Str::startsWith($lap->name, 'Penjualan ')) {
+                $aset['Bon ' . Str::after($lap->name, 'Penjualan ')] = 0;
+            }
+            
+            if (Str::startsWith($lap->name, 'Stok ')) {
+                $aset['Stok ' . Str::after($lap->name, 'Stok ')] = 0;
+            }
+
+            if (Str::startsWith($lap->name, 'Stok ')) {
+                $liabilitas['Hutang ' . Str::after($lap->name, 'Stok ')] = 0;
+            }
+
+        }
+
+        // dd($aset, $liabilitas);
+
+        /* ======================
+         * AMBIL DATA TRANSAKSI
+         * ====================== */
         $data = DB::table('detail_transaksis as dt')
             ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
             ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
             ->join('transaksis as t', 't.id', '=', 'dt.transaksi_id')
-            ->select(
-                'l.name as laporan',
+            ->whereBetween('t.tanggal', [$start, $end])
+            ->groupBy(
+                'k.name',
                 'l.type',
-                'k.name as kategori',
+                't.type',
+                't.status'
+            )
+            ->select(
+                'k.name as laporan',
+                'l.type',
                 't.type as transaksi_type',
                 't.status',
                 DB::raw('SUM(dt.sub_total) as total')
             )
-            ->whereBetween('t.tanggal', [$start, $end])
-            ->groupBy(
-                'l.name',
-                'l.type',
-                'k.name',
-                't.type',
-                't.status'
-            )
             ->get();
 
-        $aset = [];
-        $liabilitas = [];
-
+        /* ======================
+         * HITUNG SESUAI ATURAN
+         * ====================== */
         foreach ($data as $row) {
-            $laporan  = $row->laporan;
-            $kategori = $row->kategori;
-            $nilai    = (float) $row->total;
+            $laporan = $row->laporan;
+            $nilai   = (float) $row->total;
 
             /* ===== ASET ===== */
             if (
@@ -134,7 +159,11 @@ class AsetExport implements
             }
         }
 
-        /* ===== SECTION ASET ===== */
+        /* ======================
+         * OUTPUT EXCEL
+         * ====================== */
+
+        // ASET
         $rows[] = ['Aset', '', ''];
         foreach ($aset as $nama => $total) {
             $rows[] = [$nama, 'Aset', $total];
@@ -142,13 +171,15 @@ class AsetExport implements
         $rows[] = ['Total Aset', '', array_sum($aset)];
         $rows[] = [];
 
-        /* ===== SECTION LIABILITAS ===== */
+        // LIABILITAS
         $rows[] = ['Liabilitas', '', ''];
         foreach ($liabilitas as $nama => $total) {
             $rows[] = [$nama, 'Liabilitas', $total];
         }
         $rows[] = ['Total Liabilitas', '', array_sum($liabilitas)];
-        $rows[] = [];
+
+        /* ===== LABA / RUGI ===== */
+        $rows[] = ['Total Modal', '', array_sum($aset) - array_sum($liabilitas)];
 
         return $rows;
     }

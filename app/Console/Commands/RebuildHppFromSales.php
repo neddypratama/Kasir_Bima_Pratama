@@ -8,11 +8,12 @@ use App\Models\Transaksi;
 use App\Models\DetailTransaksi;
 use App\Models\StokBatch;
 use App\Models\Kategori;
+use App\Models\Barang;
 
 class RebuildHppFromSales extends Command
 {
     protected $signature = 'hpp:rebuild-from-sales';
-    protected $description = 'Rebuild FIFO stok_batch & transaksi HPP dari transaksi penjualan';
+    protected $description = 'Rebuild FIFO stok_batch & update transaksi HPP dari penjualan';
 
     public function handle()
     {
@@ -21,31 +22,17 @@ class RebuildHppFromSales extends Command
             // =====================
             // RESET FIFO
             // =====================
-            $this->info('Reset stok batch...');
+            $this->info('Reset stok batch FIFO...');
             StokBatch::query()->update([
                 'qty_sisa' => DB::raw('qty_masuk')
             ]);
 
             // =====================
-            // HAPUS DETAIL HPP
+            // AMBIL PENJUALAN
             // =====================
-            $this->info('Hapus detail transaksi HPP lama...');
-            DetailTransaksi::whereHas('transaksi', function ($q) {
-                $q->where('type', 'Debit')->where('invoice', 'like', '%-HPP-%');
-            })->delete();
-
-            // =====================
-            // HAPUS TRANSAKSI HPP
-            // =====================
-            $this->info('Hapus transaksi HPP lama...');
-            Transaksi::where('type', 'Debit')->where('invoice', 'like', '%-HPP-%')->delete();
-
-            // =====================
-            // REPLAY PENJUALAN
-            // =====================
-            $this->info('Replay transaksi penjualan FIFO...');
-
-            $penjualans = Transaksi::where('type', 'Kredit')->where('invoice', 'like', '%-DPT-%')
+            $this->info('Replay transaksi penjualan...');
+            $penjualans = Transaksi::where('type', 'Kredit')
+                ->where('invoice', 'like', '%-DPT-%')
                 ->orderBy('tanggal')
                 ->with('details.barang.jenis')
                 ->get();
@@ -55,6 +42,9 @@ class RebuildHppFromSales extends Command
                 $totalHpp = 0;
                 $hppDetails = [];
 
+                // =====================
+                // FIFO HITUNG ULANG
+                // =====================
                 foreach ($jual->details as $detail) {
 
                     $barang = $detail->barang;
@@ -71,13 +61,14 @@ class RebuildHppFromSales extends Command
 
                         $ambil = min($qty, $batch->qty_sisa);
 
-                        $subtotal = $ambil * $batch->harga_beli;
+                        $subtotal = $ambil * $batch->harga;
                         $totalHpp += $subtotal;
 
                         $hppDetails[] = [
                             'barang_id' => $barang->id,
+                            'jenis'     => $barang->jenis->name,
                             'kuantitas' => $ambil,
-                            'value'     => $batch->harga_beli,
+                            'value'     => $batch->harga,
                             'sub_total' => $subtotal,
                         ];
 
@@ -86,41 +77,56 @@ class RebuildHppFromSales extends Command
                     }
 
                     if ($qty > 0) {
-                        throw new \Exception("Stok FIFO {$barang->name} {$jual->invoice} tidak mencukupi");
+                        throw new \Exception("FIFO stok {$barang->name} tidak cukup ({$jual->invoice})");
                     }
                 }
 
                 // =====================
-                // TRANSAKSI HPP
+                // TRANSAKSI HPP (UPDATE / CREATE)
                 // =====================
-                $inv = substr($jual->invoice, -4);
-                $tanggal = explode('-', $jual->invoice)[1];
+                $invSuffix = substr($jual->invoice, -4);
+                $tanggalInv = explode('-', $jual->invoice)[1];
+                $hppInvoice = 'INV-' . $tanggalInv . '-HPP-' . $invSuffix;
 
-                $hpp = Transaksi::create([
-                    'invoice'   => 'INV-' . $tanggal . '-HPP-' . $inv,
-                    'user_id'   => $jual->user_id,
-                    'client_id' => $jual->client_id,
-                    'tanggal'   => $jual->tanggal,
-                    'type'      => 'Debit',
-                    'total'     => $totalHpp,
-                    'status'    => $jual->status,
-                    'bayar'     => $jual->bayar,
+                $hpp = Transaksi::where('invoice', $hppInvoice)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$hpp) {
+                    $hpp = Transaksi::create([
+                        'invoice'   => $hppInvoice,
+                        'user_id'   => $jual->user_id,
+                        'client_id' => $jual->client_id,
+                        'tanggal'   => $jual->tanggal,
+                        'type'      => 'Debit',
+                        'total'     => 0,
+                        'status'    => $jual->status,
+                        'bayar'     => $jual->bayar,
+                    ]);
+                }
+
+                // update total
+                $hpp->update([
+                    'total' => $totalHpp
                 ]);
 
                 // =====================
-                // DETAIL HPP
+                // DETAIL HPP (RESET PER TRANSAKSI)
                 // =====================
+                DetailTransaksi::where('transaksi_id', $hpp->id)->delete();
+
                 foreach ($hppDetails as $d) {
+
                     $kategori = Kategori::where(
                         'name',
                         'like',
-                        'HPP %' . $barang->jenis->name
-                    )->first();
+                        'HPP %' . $d['jenis']
+                    )->firstOrFail();
 
                     DetailTransaksi::create([
                         'transaksi_id' => $hpp->id,
                         'barang_id'    => $d['barang_id'],
-                        'kategori_id'  => $kategori?->id,
+                        'kategori_id'  => $kategori->id,
                         'value'        => $d['value'],
                         'kuantitas'    => $d['kuantitas'],
                         'sub_total'    => $d['sub_total'],
@@ -129,6 +135,6 @@ class RebuildHppFromSales extends Command
             }
         });
 
-        $this->info('Rebuild HPP FIFO selesai & konsisten ✅');
+        $this->info('Rebuild HPP FIFO selesai & AMAN ✅');
     }
 }

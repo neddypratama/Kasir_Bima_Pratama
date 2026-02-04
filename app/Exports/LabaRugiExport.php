@@ -2,7 +2,6 @@
 
 namespace App\Exports;
 
-use App\Models\Transaksi;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -35,10 +34,12 @@ class LabaRugiExport implements
     {
         return [
             ['LAPORAN LABA RUGI'],
-            ['Periode: ' .
+            [
+                'Periode: ' .
                 Carbon::parse($this->startDate)->format('d M Y') .
                 ' - ' .
-                Carbon::parse($this->endDate)->format('d M Y')],
+                Carbon::parse($this->endDate)->format('d M Y')
+            ],
             [],
             ['Kategori', 'Tipe', 'Total (Rp)'],
         ];
@@ -54,40 +55,67 @@ class LabaRugiExport implements
         $start = Carbon::parse($this->startDate)->startOfDay();
         $end   = Carbon::parse($this->endDate)->endOfDay();
 
-        $data = DB::table('detail_transaksis as dt')
-            ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
+        /**
+         * 1️⃣ AMBIL SEMUA KATEGORI LAPORAN (DEFAULT 0)
+         */
+        $kategori = DB::table('kategoris as k')
             ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
-            ->join('transaksis as t', 't.id', '=', 'dt.transaksi_id')
+            ->whereIn('l.type', ['Pendapatan', 'Pengeluaran'])
             ->select(
-                'l.name as laporan',
-                'l.type',
+                'k.id',
                 'k.name as kategori',
-                DB::raw('SUM(dt.sub_total) as total')
+                'l.name as laporan',
+                'l.type'
             )
-            ->where('t.status', 'Lunas')
-            ->whereBetween('t.tanggal', [$start, $end])
-            ->groupBy('l.name', 'l.type', 'k.name')
             ->get();
 
         $pendapatan = [];
         $pengeluaran = [];
 
-        foreach ($data as $row) {
-            if ($row->type === 'Pendapatan') {
-                $pendapatan[$row->laporan] =
-                    ($pendapatan[$row->laporan] ?? 0) + $row->total;
-            }
-
-            if ($row->type === 'Pengeluaran') {
-                $pengeluaran[$row->laporan] =
-                    ($pengeluaran[$row->laporan] ?? 0) + $row->total;
+        foreach ($kategori as $k) {
+            if ($k->type === 'Pendapatan') {
+                $pendapatan[$k->kategori] = 0;
+            } else {
+                $pengeluaran[$k->kategori] = 0;
             }
         }
+
+        /**
+         * 2️⃣ AMBIL TRANSAKSI (YANG ADA SAJA)
+         */
+        $transaksi = DB::table('detail_transaksis as dt')
+            ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
+            ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
+            ->join('transaksis as t', 't.id', '=', 'dt.transaksi_id')
+            ->where('t.status', 'Lunas')
+            ->whereBetween('t.tanggal', [$start, $end])
+            ->groupBy('k.name', 'l.type')
+            ->select(
+                'k.name as kategori',
+                'l.type',
+                DB::raw('SUM(dt.sub_total) as total')
+            )
+            ->get();
+
+        /**
+         * 3️⃣ ISI NILAI SESUAI KATEGORI
+         */
+        foreach ($transaksi as $row) {
+            if ($row->type === 'Pendapatan') {
+                $pendapatan[$row->kategori] = $row->total;
+            } elseif ($row->type === 'Pengeluaran') {
+                $pengeluaran[$row->kategori] = $row->total;
+            } 
+        }
+
+        /**
+         * ===== OUTPUT =====
+         */
 
         /* ===== PENDAPATAN ===== */
         $rows[] = ['Pendapatan', '', ''];
         foreach ($pendapatan as $nama => $total) {
-            $rows[] = [$nama, 'Pendapatan', $total];
+            $rows[] = [$nama, 'Pendapatan', $total ?? 0];
         }
         $totalPendapatan = array_sum($pendapatan);
         $rows[] = ['Total Pendapatan', '', $totalPendapatan];
@@ -96,7 +124,7 @@ class LabaRugiExport implements
         /* ===== PENGELUARAN ===== */
         $rows[] = ['Pengeluaran', '', ''];
         foreach ($pengeluaran as $nama => $total) {
-            $rows[] = [$nama, 'Pengeluaran', $total];
+            $rows[] = [$nama, 'Pengeluaran', $total ?? 0];
         }
         $totalPengeluaran = array_sum($pengeluaran);
         $rows[] = ['Total Pengeluaran', '', $totalPengeluaran];

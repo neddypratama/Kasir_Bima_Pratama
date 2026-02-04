@@ -46,7 +46,7 @@ new class extends Component {
     {
         return [
             'barangs' => $this->barangs,
-            'clients' => Client::where('keterangan', 'like', '%Pembeli%')->get(),
+            'clients' => Client::where('keterangan', 'like', '%Pembeli%')->where('name', 'not like', 'Kadang %')->get(),
             'satuan' => [['id' => 'Eceran', 'name' => 'Eceran'], ['id' => 'Partai', 'name' => 'Partai']],
             'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
@@ -96,7 +96,7 @@ new class extends Component {
 
             if ($barang) {
                 $this->details[$index]['max_qty'] = $stok;
-                $this->details[$index]['kuantitas'] = 1;
+                $this->details[$index]['kuantitas'] = 0.01;
 
                 if ($this->details[$index]['satuan'] == 'Eceran') {
                     $this->details[$index]['value'] = $barang->harga_eceran;
@@ -148,7 +148,7 @@ new class extends Component {
             'details' => 'required|array|min:1',
             'details.*.barang_id' => 'required|exists:barangs,id',
             'details.*.satuan' => 'required',
-            'details.*.kuantitas' => 'required|numeric|min:1',
+            'details.*.kuantitas' => 'required|numeric|min:0.01',
         ]);
 
         DB::transaction(function () {
@@ -269,7 +269,7 @@ new class extends Component {
             'barang_id' => null,
             'satuan' => null,
             'value' => 0,
-            'kuantitas' => 1,
+            'kuantitas' => 0.01,
             'max_qty' => null,
         ];
     }
@@ -323,22 +323,13 @@ new class extends Component {
                                     <x-choices-offline placeholder="Pilih Barang"
                                         wire:model.live="details.{{ $index }}.barang_id" :options="$barangs" single
                                         searchable clearable label="Barang">
-                                        {{-- Tampilan item di dropdown --}} @scope('item', $barangs)
-                                            <x-list-item :item="$barangs">
-                                            </x-list-item>
-                                        @endscope
-
-                                        {{-- Tampilan ketika sudah dipilih --}}
-                                        @scope('selection', $barangs)
-                                            {{ $barangs->name }}
-                                        @endscope
                                     </x-choices-offline>
                                 </div>
                                 <x-select label="Satuan" wire:model.live="details.{{ $index }}.satuan"
                                     :options="$satuan" placeholder="Pilih Satuan" />
                                 <x-input label="Harga Jual"
                                     value="Rp {{ number_format($item['value'] ?? 0, 0, '.', ',') }}" readonly />
-                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="1"
+                                <x-input label="Qty (Max {{ $item['max_qty'] ?? '-' }})" type="number" min="0.01"
                                     step="0.01" wire:model.lazy="details.{{ $index }}.kuantitas" />
                                 <x-input label="Total Item"
                                     value="Rp {{ number_format(($item['value'] ?? 0) * ($item['kuantitas'] ?? 1), 0, '.', ',') }}"

@@ -11,6 +11,7 @@ class Laporan extends Model
     protected $fillable = [
         'name',
         'deskripsi',
+        'type'
     ];
 
     public function kategoris()
