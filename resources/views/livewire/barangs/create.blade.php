@@ -20,13 +20,7 @@ new class extends Component {
     public ?int $jenis_id = null;
 
     #[Rule('required|numeric|min:0')]
-    public float $stok = 0.0;
-
-    #[Rule('required|numeric|min:0')]
     public float $eceran = 0.0;
-
-    #[Rule('nullable|numeric|min:0')]
-    public float $hpp = 0.0;
 
     #[Rule('nullable|numeric|min:0')]
     public float $sak = 0.0;
@@ -45,8 +39,6 @@ new class extends Component {
         $barang = Barang::create([
             'name' => $this->name,
             'jenis_id' => $this->jenis_id,
-            'stok' => $this->stok,
-            'hpp' => $this->hpp,
             'harga_eceran' => $this->eceran,
             'harga_sak' => $this->sak,
         ]);
@@ -69,12 +61,10 @@ new class extends Component {
             </div>
 
             <div class="col-span-5 grid gap-3">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <x-input label="Nama Barang" wire:model="name" placeholder="Contoh: Dog Food Premium" />
                     <x-select label="Jenis Barang" wire:model="jenis_id" :options="$jenisbarang" option-label="name"
                         option-value="id" placeholder="Pilih jenis barang" />
-                    <x-input label="Harga Pokok (HPP)" wire:model="hpp" prefix="Rp " money="IDR" />
-
                 </div>
             </div>
         </div>
@@ -87,10 +77,9 @@ new class extends Component {
                 <x-header title="Details" subtitle="Informasi lengkap barang" size="text-2xl" />
             </div>
             <div class="col-span-5 grid gap-3">
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <x-input label="Harga Eceran" wire:model="eceran" prefix="Rp " money="IDR" />
                     <x-input label="Harga Partai" wire:model="sak" prefix="Rp " money="IDR" />
-                    <x-input label="Stok" wire:model="stok" type="number" min="0" step="0.01" />
                 </div>
             </div>
         </div>
