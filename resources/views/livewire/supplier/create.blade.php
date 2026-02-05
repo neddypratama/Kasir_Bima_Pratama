@@ -154,6 +154,7 @@ new class extends Component {
                 // 🔥 INI KUNCI FIFO
                 StokBatch::create([
                     'barang_id' => $barang->id,
+                    'user_id' => $this->user_id,
                     'detail_transaksi_id' => $detail->id,
                     'tanggal' => $this->tanggal,
                     'qty_masuk' => $item['kuantitas'],

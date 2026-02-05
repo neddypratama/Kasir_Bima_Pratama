@@ -21,6 +21,9 @@ new class extends Component {
     public ?int $client_id = null;
 
     #[Rule('required')]
+    public ?int $user_id = null;
+
+    #[Rule('required')]
     public float $total = 0;
 
     #[Rule('required')]
@@ -58,6 +61,7 @@ new class extends Component {
         $this->uang = $transaksi->uang;
         $this->bayar = $transaksi->bayar;
         $this->barangs = Barang::all();
+        $this->user_id = $transaksi->user_id;
 
         foreach ($transaksi->details as $detail) {
             $barang = $detail->barang;
@@ -159,14 +163,15 @@ new class extends Component {
                 ]);
 
                 // buat stok batch FIFO
-                // StokBatch::create([
-                //     'barang_id' => $barang->id,
-                //     'detail_transaksi_id' => $detail->id,
-                //     'qty_masuk' => $item['kuantitas'],
-                //     'qty_sisa' => $item['kuantitas'],
-                //     'harga' => $item['value'],
-                //     'tanggal' => $this->tanggal,
-                // ]);
+                StokBatch::create([
+                    'barang_id' => $barang->id,
+                    'user_id' => $this->user_id,
+                    'detail_transaksi_id' => $detail->id,
+                    'qty_masuk' => $item['kuantitas'],
+                    'qty_sisa' => $item['kuantitas'],
+                    'harga' => $item['value'],
+                    'tanggal' => $this->tanggal,
+                ]);
             }
         });
 
