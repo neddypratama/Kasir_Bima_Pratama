@@ -22,7 +22,6 @@ new class extends Component {
     public string $invoice = '';
     public string $invoice1 = '';
     public string $invoice2 = '';
-    public string $invoice3 = '';
 
     #[Rule('required')]
     public ?int $barang_id = null;
@@ -39,12 +38,6 @@ new class extends Component {
 
     #[Rule('nullable|numeric|min:0')]
     public float $kurang = 0;
-
-    #[Rule('nullable|numeric')]
-    public float $kotor = 0;
-
-    #[Rule('nullable|numeric|min:0')]
-    public float $pecah = 0;
 
     public function with(): array
     {
@@ -67,16 +60,15 @@ new class extends Component {
             $tanggal = Carbon::parse($value)->format('Ymd');
             $str = Str::upper(Str::random(4));
             $this->invoice = 'INV-' . $tanggal . '-UPD-' . $str;
-            $this->invoice1 = 'INV-' . $tanggal . '-RTN-' . $str;
-            $this->invoice2 = 'INV-' . $tanggal . '-KDL-' . $str;
-            $this->invoice3 = 'INV-' . $tanggal . '-FIX-' . $str;
+            $this->invoice1 = 'INV-' . $tanggal . '-TBH-' . $str;
+            $this->invoice2 = 'INV-' . $tanggal . '-KRG-' . $str;
         }
     }
 
     public function updatedBarangId($id): void
     {
         if ($id) {
-            $barang = StokBatch::where('barang_id',$id)->sum('qty_sisa');
+            $barang = StokBatch::where('barang_id', $id)->sum('qty_sisa');
             $this->stok = $barang ?? 0;
             $this->awal = $barang ?? 0;
         }
@@ -84,17 +76,40 @@ new class extends Component {
 
     public function updated($field): void
     {
-        if (in_array($field, ['tambah', 'kurang', 'kotor', 'pecah'])) {
-            $barang = StokBatch::where('barang_id',$this->barang_id)->sum('qty_sisa');
+        if (in_array($field, ['tambah', 'kurang'])) {
+            $barang = StokBatch::where('barang_id', $this->barang_id)->sum('qty_sisa');
             if ($barang) {
                 $stok_awal = $barang ?? 0;
-                $stok_baru = $stok_awal + $this->tambah - ($this->kurang + $this->kotor + $this->pecah);
+                $stok_baru = $stok_awal + $this->tambah - $this->kurang;
                 $this->stok = max(0, $stok_baru);
             }
         }
     }
 
-    private function kurangiStokFifoDanHitungHpp(int $barangId, int $qtyKeluar): float
+    private function tambahStokFifoDanHitungHpp(int $barangId, float $qtyKeluar): float
+    {
+        $totalHpp = 0;
+
+        $batches = StokBatch::where('barang_id', $barangId)->where('qty_sisa', '>', 0)->orderByDesc('tanggal')->lockForUpdate()->get();
+
+        foreach ($batches as $batch) {
+            if ($qtyKeluar <= 0) {
+                break;
+            }
+
+            $ambil = min($batch->qty_sisa, $qtyKeluar);
+
+            $batch->increment('qty_sisa', $ambil);
+
+            $totalHpp += $ambil * $batch->harga;
+
+            $qtyKeluar -= $ambil;
+        }
+
+        return $totalHpp;
+    }
+
+    private function kurangiStokFifoDanHitungHpp(int $barangId, float $qtyKeluar): float
     {
         $totalHpp = 0;
 
@@ -136,106 +151,15 @@ new class extends Component {
                 'tanggal' => $this->tanggal,
                 'tambah' => $this->tambah,
                 'kurang' => $this->kurang,
-                'kotor' => $this->kotor,
-                'rusak' => $this->pecah,
             ]);
 
-            /* =========================
-                TRANSAKSI BARANG KADALUARSA
-            ========================== */
-            if ($this->pecah > 0) {
-                $hppPecah = $this->kurangiStokFifoDanHitungHpp($this->barang_id, $this->pecah);
+            $kategori = Kategori::where('name', 'Perbaikan Stok')->first();
+
+            if ($this->tambah > 0) {
+                $hppReturn = $this->tambahStokFifoDanHitungHpp($this->barang_id, $this->tambah);
 
                 $transaksi = Transaksi::create([
                     'invoice' => $this->invoice1,
-                    'name' => 'Barang Kadaluarsa ' . Barang::find($this->barang_id)->name,
-                    'user_id' => $this->user_id,
-                    'tanggal' => $this->tanggal,
-                    'type' => 'Debit',
-                    'total' => $hppPecah,
-                    'status' => 'Lunas',
-                    'bayar' => 'Cash',
-                ]);
-
-                $kategori = Kategori::where('name', 'Barang Kadaluarsa')->first();
-
-                DetailTransaksi::create([
-                    'transaksi_id' => $transaksi->id,
-                    'barang_id' => $this->barang_id,
-                    'kategori_id' => $kategori->id,
-                    'value' => $hppPecah / $this->pecah,
-                    'kuantitas' => $this->pecah,
-                    'sub_total' => $hppPecah,
-                ]);
-            }
-
-            /* =========================
-            TRANSAKSI BARANG RETURN
-        ========================== */
-            if ($this->kotor > 0) {
-                $hppReturn = $this->kurangiStokFifoDanHitungHpp($this->barang_id, $this->kotor);
-
-                $transaksi = Transaksi::create([
-                    'invoice' => $this->invoice2,
-                    'name' => 'Barang Return ' . Barang::find($this->barang_id)->name,
-                    'user_id' => $this->user_id,
-                    'tanggal' => $this->tanggal,
-                    'type' => 'Debit',
-                    'total' => $hppReturn,
-                    'status' => 'Lunas',
-                    'bayar' => 'Cash',
-                ]);
-
-                $kategori = Kategori::where('name', 'Barang Return')->first();
-
-                DetailTransaksi::create([
-                    'transaksi_id' => $transaksi->id,
-                    'barang_id' => $this->barang_id,
-                    'kategori_id' => $kategori->id,
-                    'value' => $hppReturn / $this->kotor,
-                    'kuantitas' => $this->kotor,
-                    'sub_total' => $hppReturn,
-                ]);
-            } else {
-                $hppReturn = StokBatch::where('barang_id', $this->barang_id)->latest()->harga;
-
-                $transaksi = Transaksi::create([
-                    'invoice' => $this->invoice2,
-                    'name' => 'Barang Return ' . Barang::find($this->barang_id)->name,
-                    'user_id' => $this->user_id,
-                    'tanggal' => $this->tanggal,
-                    'type' => 'Kredit',
-                    'total' => $hppReturn * $this->kotor,
-                    'status' => 'Lunas',
-                    'bayar' => 'Cash',
-                ]);
-
-                $kategori = Kategori::where('name', 'Barang Return')->first();
-
-                $detail = DetailTransaksi::create([
-                    'transaksi_id' => $transaksi->id,
-                    'barang_id' => $this->barang_id,
-                    'kategori_id' => $kategori->id,
-                    'value' => $hppReturn,
-                    'kuantitas' => $this->kotor,
-                    'sub_total' => $hppReturn * $this->kotor,
-                ]);
-
-                StokBatch::create([
-                    'barang_id' => $this->barang_id,
-                    'detail_transaksi_id' => $detail->id,
-                    'tanggal' => $this->tanggal,
-                    'qty_masuk' => $this->kotor,
-                    'qty_sisa' => $this->kotor,
-                    'harga' => $hppReturn,
-                ]);
-            }
-
-            if ($this->tambah > 0) {
-                $hppReturn = StokBatch::where('barang_id', $this->barang_id)->latest()->harga;
-
-                $transaksi = Transaksi::create([
-                    'invoice' => $this->invoice3,
                     'name' => 'Barang Tambah ' . Barang::find($this->barang_id)->name,
                     'user_id' => $this->user_id,
                     'tanggal' => $this->tanggal,
@@ -245,8 +169,6 @@ new class extends Component {
                     'bayar' => 'Cash',
                 ]);
 
-                $kategori = Kategori::where('name', 'Perbaikan Stok')->first();
-
                 $detail = DetailTransaksi::create([
                     'transaksi_id' => $transaksi->id,
                     'barang_id' => $this->barang_id,
@@ -255,22 +177,13 @@ new class extends Component {
                     'kuantitas' => $this->tambah,
                     'sub_total' => $hppReturn * $this->tambah,
                 ]);
-
-                StokBatch::create([
-                    'barang_id' => $this->barang_id,
-                    'detail_transaksi_id' => $detail->id,
-                    'tanggal' => $this->tanggal,
-                    'qty_masuk' => $this->tambah,
-                    'qty_sisa' => $this->tambah,
-                    'harga' => $hppReturn,
-                ]);
             }
 
             if ($this->kurang > 0) {
                 $hppReturn = $this->kurangiStokFifoDanHitungHpp($this->barang_id, $this->kurang);
 
                 $transaksi = Transaksi::create([
-                    'invoice' => $this->invoice3,
+                    'invoice' => $this->invoice2,
                     'name' => 'Barang Kurang ' . Barang::find($this->barang_id)->name,
                     'user_id' => $this->user_id,
                     'tanggal' => $this->tanggal,
@@ -290,19 +203,12 @@ new class extends Component {
                     'kuantitas' => $this->kurang,
                     'sub_total' => $hppReturn,
                 ]);
-
-                StokBatch::create([
-                    'barang_id' => $this->barang_id,
-                    'detail_transaksi_id' => $detail->id,
-                    'tanggal' => $this->tanggal,
-                    'qty_masuk' => $this->kurang,
-                    'qty_sisa' => $this->kurang,
-                    'harga' => $hppReturn,
-                ]);
             }
+        });
 
         $this->success('Stok & transaksi berhasil diperbarui', redirectTo: '/stok');
     }
+};
 ?>
 
 <div class="p-4 space-y-6">
@@ -340,12 +246,9 @@ new class extends Component {
                 </div>
                 <div class="col-span-6 grid gap-3">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end p-3 rounded-xl">
-                        <x-input label="Pakan Bertambah" wire:model.lazy="tambah" type="number" step="0.01"
+                        <x-input label="Barang Bertambah" wire:model.lazy="tambah" type="number" step="0.01"
                             min="0" />
-                        <x-input label="Pakan Berkurang" wire:model.lazy="kurang" type="number" step="0.01"
-                            min="0" />
-                        <x-input label="Pakan Return" wire:model.lazy="kotor" type="number" step="0.01" />
-                        <x-input label="Pakan Kadaluarsa" wire:model.lazy="pecah" type="number" step="0.01"
+                        <x-input label="Barang Berkurang" wire:model.lazy="kurang" type="number" step="0.01"
                             min="0" />
                     </div>
                 </div>
@@ -354,7 +257,7 @@ new class extends Component {
 
         <x-slot:actions>
             <div class="flex flex-row sm:flex-row gap-2 justify-end">
-                <x-button spinner label="Cancel" link="/stok-pakan" />
+                <x-button spinner label="Cancel" link="/stok" />
                 <x-button spinner label="Create" icon="o-paper-airplane" spinner="save" type="submit"
                     class="btn-primary" />
             </div>

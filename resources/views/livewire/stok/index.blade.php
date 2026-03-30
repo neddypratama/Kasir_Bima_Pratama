@@ -63,20 +63,20 @@ new class extends Component {
         return Excel::download(new StokPakanExport($this->startDate, $this->endDate), 'stok.xlsx');
     }
 
-    public function delete($id): void
-    {
-        $stok = Stok::with('barang')->findOrFail($id);
+    // public function delete($id): void
+    // {
+    //     $stok = Stok::with('barang')->findOrFail($id);
 
-        $barang = $stok->barang;
-        if ($barang) {
-            // kembalikan stok ke kondisi sebelum transaksi
-            $stok_awal = $barang->stok - $stok->tambah + ($stok->kurang + $stok->kotor + $stok->rusak);
-            $barang->update(['stok' => max(0, $stok_awal)]);
-        }
-        $stok->delete();
+    //     $barang = $stok->barang;
+    //     if ($barang) {
+    //         // kembalikan stok ke kondisi sebelum transaksi
+    //         $stok_awal = $barang->stok - $stok->tambah + ($stok->kurang + $stok->kotor + $stok->rusak);
+    //         $barang->update(['stok' => max(0, $stok_awal)]);
+    //     }
+    //     $stok->delete();
 
-        $this->warning("Stok $id berhasil dihapus", position: 'toast-top');
-    }
+    //     $this->warning("Stok $id berhasil dihapus", position: 'toast-top');
+    // }
 
     public function headers(): array
     {
@@ -174,9 +174,9 @@ new class extends Component {
             @scope('actions', $transaksi)
                 <div class="flex">
                     @if (Auth::user()->role_id == 1)
-                        <x-button icon="o-trash" wire:click="delete({{ $transaksi->id }})"
+                        {{-- <x-button icon="o-trash" wire:click="delete({{ $transaksi->id }})"
                             wire:confirm="Yakin ingin menghapus transaksi {{ $transaksi->invoice }} ini?" spinner
-                            class="btn-ghost btn-sm text-red-500" />
+                            class="btn-ghost btn-sm text-red-500" /> --}}
                     @endif
                     @if (Auth::user()->role_id == 1 ||
                             (Carbon::parse($transaksi->tanggal)->isSameDay($this->today) && $transaksi->user_id == Auth::user()->id))
