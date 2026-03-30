@@ -213,7 +213,6 @@ new class extends Component {
 ?>
 
 <div class="p-4 space-y-6">
-    <dd>{{ $this->stok }}, {{ $this->tambah }}</dd>
     <x-header title="Create Transaksi Stok Pakan" separator progress-indicator />
 
     <x-form wire:submit="save">
