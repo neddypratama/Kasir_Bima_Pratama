@@ -136,7 +136,7 @@ new class extends Component {
     public function save(): void
     {
         $this->validate();
-        if ($this->stok <= 0) {
+        if ($this->stok < 0) {
             $this->error('Stok tidak mencukupi untuk pengurangan atau transaksi gagal');
             return;
         }
