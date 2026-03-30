@@ -77,12 +77,13 @@ new class extends Component {
     public function updated($field): void
     {
         if (in_array($field, ['tambah', 'kurang'])) {
-            $barang = StokBatch::where('barang_id', $this->barang_id)->sum('qty_sisa');
-            if ($barang) {
-                $stok_awal = $barang ?? 0;
-                $stok_baru = $stok_awal + $this->tambah - $this->kurang;
-                $this->stok = max(0, $stok_baru);
-            }
+            // Ambil jumlah sisa, pastikan defaultnya 0 jika tidak ditemukan
+            $stok_db = StokBatch::where('barang_id', $this->barang_id)->sum('qty_sisa') ?: 0;
+
+            $stok_baru = $stok_db + (float) $this->tambah - (float) $this->kurang;
+
+            // Tetap update nilai stok meskipun stok_db adalah 0
+            $this->stok = max(0, $stok_baru);
         }
     }
 
@@ -212,6 +213,7 @@ new class extends Component {
 ?>
 
 <div class="p-4 space-y-6">
+    <dd>{{ $this->stok }}, {{ $this->tambah }}</dd>
     <x-header title="Create Transaksi Stok Pakan" separator progress-indicator />
 
     <x-form wire:submit="save">
