@@ -87,127 +87,142 @@ new class extends Component {
         }
     }
 
-    private function tambahStokFifoDanHitungHpp(int $barangId, float $qtyKeluar): float
-    {
-        $totalHpp = 0;
-
-        $batches = StokBatch::where('barang_id', $barangId)->where('qty_sisa', '>', 0)->orderByDesc('tanggal')->lockForUpdate()->get();
-
-        foreach ($batches as $batch) {
-            if ($qtyKeluar <= 0) {
-                break;
-            }
-
-            $ambil = min($batch->qty_sisa, $qtyKeluar);
-
-            $batch->increment('qty_sisa', $ambil);
-
-            $totalHpp += $ambil * $batch->harga;
-
-            $qtyKeluar -= $ambil;
-        }
-
-        return $totalHpp;
-    }
-
-    private function kurangiStokFifoDanHitungHpp(int $barangId, float $qtyKeluar): float
-    {
-        $totalHpp = 0;
-
-        $batches = StokBatch::where('barang_id', $barangId)->where('qty_sisa', '>', 0)->orderBy('tanggal')->lockForUpdate()->get();
-
-        foreach ($batches as $batch) {
-            if ($qtyKeluar <= 0) {
-                break;
-            }
-
-            $ambil = min($batch->qty_sisa, $qtyKeluar);
-
-            $batch->decrement('qty_sisa', $ambil);
-
-            $totalHpp += $ambil * $batch->harga;
-
-            $qtyKeluar -= $ambil;
-        }
-
-        return $totalHpp;
-    }
-
     public function save(): void
     {
         $this->validate();
-        if ($this->stok < 0) {
-            $this->error('Stok tidak mencukupi untuk pengurangan atau transaksi gagal');
-            return;
-        }
 
         DB::transaction(function () {
             /* =========================
-                LOG STOK
-            ========================== */
-            Stok::create([
-                'invoice' => $this->invoice,
-                'user_id' => $this->user_id,
-                'barang_id' => $this->barang_id,
-                'tanggal' => $this->tanggal,
-                'tambah' => $this->tambah,
-                'kurang' => $this->kurang,
-            ]);
+           VALIDASI STOK (WAJIB)
+        ========================== */
+            $totalStok = StokBatch::where('barang_id', $this->barang_id)->sum('qty_sisa');
 
-            $kategori = Kategori::where('name', 'Perbaikan Stok')->first();
-
-            if ($this->tambah > 0) {
-                $hppReturn = $this->tambahStokFifoDanHitungHpp($this->barang_id, $this->tambah);
-
-                $transaksi = Transaksi::create([
-                    'invoice' => $this->invoice1,
-                    'name' => 'Barang Tambah ' . Barang::find($this->barang_id)->name,
+            if ($this->kurang > $totalStok) {
+                $this->error('Stok tidak mencukupi untuk transaksi ini.', position: 'toast-top');
+                return;
+            } else {
+                /* =========================
+           LOG STOK
+        ========================== */
+                Stok::create([
+                    'invoice' => $this->invoice,
                     'user_id' => $this->user_id,
-                    'tanggal' => $this->tanggal,
-                    'type' => 'Debit',
-                    'total' => $hppReturn * $this->tambah,
-                    'status' => 'Lunas',
-                    'bayar' => 'Cash',
-                ]);
-
-                $detail = DetailTransaksi::create([
-                    'transaksi_id' => $transaksi->id,
                     'barang_id' => $this->barang_id,
-                    'kategori_id' => $kategori->id,
-                    'value' => $hppReturn,
-                    'kuantitas' => $this->tambah,
-                    'sub_total' => $hppReturn * $this->tambah,
-                ]);
-            }
-
-            if ($this->kurang > 0) {
-                $hppReturn = $this->kurangiStokFifoDanHitungHpp($this->barang_id, $this->kurang);
-
-                $transaksi = Transaksi::create([
-                    'invoice' => $this->invoice2,
-                    'name' => 'Barang Kurang ' . Barang::find($this->barang_id)->name,
-                    'user_id' => $this->user_id,
                     'tanggal' => $this->tanggal,
-                    'type' => 'Kredit',
-                    'total' => $hppReturn,
-                    'status' => 'Lunas',
-                    'bayar' => 'Cash',
+                    'tambah' => $this->tambah,
+                    'kurang' => $this->kurang,
                 ]);
 
-                $kategori = Kategori::where('name', 'Perbaikan Stok')->first();
+                $kategori = Kategori::where('name', 'Perbaikan Stok')->firstOrFail();
 
-                $detail = DetailTransaksi::create([
-                    'transaksi_id' => $transaksi->id,
-                    'barang_id' => $this->barang_id,
-                    'kategori_id' => $kategori->id,
-                    'value' => $hppReturn / $this->kurang,
-                    'kuantitas' => $this->kurang,
-                    'sub_total' => $hppReturn,
-                ]);
+                /* ======================================================
+           🔥 TAMBAH STOK (BENAR: BUAT BATCH BARU)
+        ====================================================== */
+                if ($this->tambah > 0) {
+                    // ambil harga terakhir (opsional)
+                    $lastHarga = StokBatch::where('barang_id', $this->barang_id)->latest('tanggal')->value('harga') ?? 0;
+
+                    $transaksi = Transaksi::create([
+                        'invoice' => $this->invoice1,
+                        'name' => 'Penyesuaian Tambah - ' . Barang::find($this->barang_id)->name,
+                        'user_id' => $this->user_id,
+                        'tanggal' => $this->tanggal,
+                        'type' => 'Debit',
+                        'total' => $lastHarga * $this->tambah,
+                        'status' => 'Lunas',
+                        'bayar' => 'Cash',
+                    ]);
+
+                    $detail = DetailTransaksi::create([
+                        'transaksi_id' => $transaksi->id,
+                        'barang_id' => $this->barang_id,
+                        'kategori_id' => $kategori->id,
+                        'value' => $lastHarga,
+                        'kuantitas' => $this->tambah,
+                        'sub_total' => $lastHarga * $this->tambah,
+                        'tanggal' => $this->tanggal,
+                    ]);
+
+                    // 🔥 WAJIB: buat batch baru
+                    StokBatch::create([
+                        'barang_id' => $this->barang_id,
+                        'detail_transaksi_id' => $detail->id,
+                        'user_id' => $this->user_id,
+                        'qty_masuk' => $this->tambah,
+                        'qty_sisa' => $this->tambah,
+                        'harga' => $lastHarga,
+                        'tanggal' => $this->tanggal,
+                    ]);
+                }
+
+                /* ======================================================
+           🔥 KURANG STOK (FIFO BENAR)
+        ====================================================== */
+                if ($this->kurang > 0) {
+                    $qtyKeluar = $this->kurang;
+                    $totalHpp = 0;
+
+                    $transaksi = Transaksi::create([
+                        'invoice' => $this->invoice2,
+                        'name' => 'Penyesuaian Kurang - ' . Barang::find($this->barang_id)->name,
+                        'user_id' => $this->user_id,
+                        'tanggal' => $this->tanggal,
+                        'type' => 'Kredit',
+                        'total' => 0, // nanti diupdate
+                        'status' => 'Lunas',
+                        'bayar' => 'Cash',
+                    ]);
+
+                    $detail = DetailTransaksi::create([
+                        'transaksi_id' => $transaksi->id,
+                        'barang_id' => $this->barang_id,
+                        'kategori_id' => $kategori->id,
+                        'value' => 0,
+                        'kuantitas' => $this->kurang,
+                        'sub_total' => 0,
+                        'tanggal' => $this->tanggal,
+                    ]);
+
+                    $batches = StokBatch::where('barang_id', $this->barang_id)
+                        ->where('qty_sisa', '>', 0)
+                        ->orderBy('tanggal') // FIFO
+                        ->lockForUpdate()
+                        ->get();
+
+                    foreach ($batches as $batch) {
+                        if ($qtyKeluar <= 0) {
+                            break;
+                        }
+
+                        $ambil = min($batch->qty_sisa, $qtyKeluar);
+
+                        // kurangi stok
+                        $batch->decrement('qty_sisa', $ambil);
+
+                        $hpp = $ambil * $batch->harga;
+                        $totalHpp += $hpp;
+
+                        $qtyKeluar -= $ambil;
+                    }
+
+                    if ($qtyKeluar > 0) {
+                        throw new \Exception('FIFO gagal, stok tidak cukup');
+                    }
+
+                    // update detail
+                    $detail->update([
+                        'value' => $totalHpp / $this->kurang,
+                        'sub_total' => $totalHpp,
+                    ]);
+
+                    // update transaksi
+                    $transaksi->update([
+                        'total' => $totalHpp,
+                    ]);
+                }
+                $this->success('Stok & transaksi berhasil diperbarui', redirectTo: '/stok');
             }
         });
-
-        $this->success('Stok & transaksi berhasil diperbarui', redirectTo: '/stok');
     }
 };
 ?>

@@ -112,65 +112,106 @@ new class extends Component {
     }
 
     /* =========================
-        FIFO UNIVERSAL
-    ========================== */
+    FIFO UNIVERSAL (FIXED)
+========================== */
     private function fifo(
         int $barangId,
         float $qty,
-        string $mode = 'out', // out = kurangi, in = kembalikan
+        int $detailId,
+        string $mode = 'out', // hanya pakai 'out'
         bool $withHpp = false,
     ): float {
         $totalHpp = 0;
 
-        $query = StokBatch::where('barang_id', $barangId)->where('qty_sisa', '>', 0)->lockForUpdate();
+        if ($mode !== 'out') {
+            throw new \Exception('FIFO hanya untuk OUT, rollback pakai histori!');
+        }
 
-        $query = $mode === 'out' ? $query->orderBy('tanggal') : $query->orderByDesc('tanggal');
+        $query = StokBatch::where('barang_id', $barangId)
+            ->where('qty_sisa', '>', 0)
+            ->orderBy('tanggal') // FIFO
+            ->lockForUpdate()
+            ->get();
 
-        foreach ($query->get() as $batch) {
+        foreach ($query as $batch) {
             if ($qty <= 0) {
                 break;
             }
 
             $ambil = min($batch->qty_sisa, $qty);
 
-            $mode === 'out' ? $batch->decrement('qty_sisa', $ambil) : $batch->increment('qty_sisa', $ambil);
+            // kurangi stok
+            $batch->decrement('qty_sisa', $ambil);
 
             if ($withHpp) {
                 $totalHpp += $ambil * $batch->harga;
             }
 
+            // 🔥 simpan histori keluar
+            StokKeluarBatch::create([
+                'stok_batch_id' => $batch->id,
+                'detail_transaksi_id' => $detailId,
+                'qty' => $ambil,
+                'harga' => $batch->harga,
+                'returned_qty' => 0,
+            ]);
+
             $qty -= $ambil;
+        }
+
+        if ($qty > 0) {
+            throw new \Exception('Stok tidak cukup (FIFO gagal)');
         }
 
         return $totalHpp;
     }
 
     /* =========================
-        UPDATE
-    ========================== */
+    ROLLBACK (WAJIB ADA)
+========================== */
+    private function rollbackFifo(int $detailId): void
+    {
+        $keluars = StokKeluarBatch::where('detail_transaksi_id', $detailId)->get();
+
+        foreach ($keluars as $keluar) {
+            $batch = StokBatch::find($keluar->stok_batch_id);
+
+            if ($batch) {
+                $batch->increment('qty_sisa', $keluar->qty);
+            }
+
+            $keluar->delete();
+        }
+    }
+
+    /* =========================
+    UPDATE (FIX TOTAL)
+========================== */
     public function update(): void
     {
         $this->validate();
 
-        if ($this->stok < 0) {
-            $this->error('Stok tidak mencukupi');
-            return;
-        }
-
         DB::transaction(function () {
             $stok = Stok::findOrFail($this->stokModel->id);
-            $barang = Barang::findOrFail($stok->barang_id);
 
             /* =========================
-                1️⃣ ROLLBACK TRANSAKSI LAMA
-            ========================== */
-            $this->fifo($stok->barang_id, $stok->kurang, 'in');
-            $this->fifo($stok->barang_id, $stok->kotor, 'in');
-            $this->fifo($stok->barang_id, $stok->rusak, 'in');
+            1️⃣ ROLLBACK TRANSAKSI LAMA
+        ========================== */
+            $transaksis = Transaksi::where('name', 'like', '%' . $stok->invoice . '%')->get();
+
+            foreach ($transaksis as $trx) {
+                $details = DetailTransaksi::where('transaksi_id', $trx->id)->get();
+
+                foreach ($details as $detail) {
+                    $this->rollbackFifo($detail->id);
+                }
+
+                $trx->delete();
+            }
 
             /* =========================
-                2️⃣ UPDATE LOG STOK
-            ========================== */
+            2️⃣ UPDATE LOG STOK
+        ========================== */
             $stok->update([
                 'barang_id' => $this->barang_id,
                 'tanggal' => $this->tanggal,
@@ -181,26 +222,47 @@ new class extends Component {
             ]);
 
             /* =========================
-                3️⃣ APPLY TRANSAKSI BARU
-            ========================== */
-            $this->fifo($this->barang_id, $this->kurang, 'out');
+            3️⃣ VALIDASI STOK
+        ========================== */
+            $totalStok = StokBatch::where('barang_id', $this->barang_id)->sum('qty_sisa');
 
-            /* =========================
-                BARANG KADALUARSA
-            ========================== */
-            if ($this->pecah > 0) {
-                $hpp = $this->fifo($this->barang_id, $this->pecah, 'out', true);
-
-                $trx = $this->syncTransaksi('KDL', 'Barang Kadaluarsa', $hpp, $this->pecah);
+            if ($this->kurang > $totalStok) {
+                throw new \Exception('Stok tidak mencukupi');
             }
 
             /* =========================
-                BARANG RETURN
-            ========================== */
-            if ($this->kotor > 0) {
-                $hpp = $this->fifo($this->barang_id, $this->kotor, 'out', true);
+            4️⃣ APPLY TRANSAKSI BARU
+        ========================== */
 
-                $trx = $this->syncTransaksi('RTN', 'Barang Return', $hpp, $this->kotor);
+            // 🔥 KURANG
+            if ($this->kurang > 0) {
+                $hpp = $this->syncTransaksi('KRG', 'Barang Kurang', $this->kurang);
+            }
+
+            // 🔥 BARANG RUSAK
+            if ($this->pecah > 0) {
+                $hpp = $this->syncTransaksi('RUSAK', 'Barang Rusak', $this->pecah);
+            }
+
+            // 🔥 BARANG RETURN
+            if ($this->kotor > 0) {
+                $hpp = $this->syncTransaksi('RETUR', 'Barang Return', $this->kotor);
+            }
+
+            /* =========================
+            5️⃣ TAMBAH STOK (BATCH BARU)
+        ========================== */
+            if ($this->tambah > 0) {
+                $lastHarga = StokBatch::where('barang_id', $this->barang_id)->latest('tanggal')->value('harga') ?? 0;
+
+                StokBatch::create([
+                    'barang_id' => $this->barang_id,
+                    'detail_transaksi_id' => null,
+                    'qty_masuk' => $this->tambah,
+                    'qty_sisa' => $this->tambah,
+                    'harga' => $lastHarga,
+                    'tanggal' => $this->tanggal,
+                ]);
             }
         });
 
@@ -208,37 +270,47 @@ new class extends Component {
     }
 
     /* =========================
-        SYNC TRANSAKSI HPP
-    ========================== */
-    private function syncTransaksi(string $kode, string $nama, float $totalHpp, float $qty): void
+    SYNC TRANSAKSI (FIX FIFO)
+========================== */
+    private function syncTransaksi(string $kode, string $nama, float $qty): float
     {
         $inv = substr($this->stokModel->invoice, -4);
         $tgl = explode('-', $this->stokModel->invoice)[1];
 
-        $trx = Transaksi::firstOrCreate(
-            ['invoice' => "INV-$tgl-$kode-$inv"],
-            [
-                'name' => "$nama " . Barang::find($this->barang_id)->name,
-                'user_id' => $this->user_id,
-                'tanggal' => $this->tanggal,
-                'type' => 'Debit',
-                'status' => 'Lunas',
-                'bayar' => 'Cash',
-            ],
-        );
+        $trx = Transaksi::create([
+            'invoice' => "INV-$tgl-$kode-$inv-" . time(),
+            'name' => "$nama " . Barang::find($this->barang_id)->name,
+            'user_id' => $this->user_id,
+            'tanggal' => $this->tanggal,
+            'type' => 'Debit',
+            'status' => 'Lunas',
+            'bayar' => 'Cash',
+            'total' => 0,
+        ]);
 
-        $trx->update(['total' => $totalHpp]);
+        $detail = DetailTransaksi::create([
+            'transaksi_id' => $trx->id,
+            'barang_id' => $this->barang_id,
+            'kategori_id' => Kategori::where('name', $nama)->first()->id,
+            'value' => 0,
+            'kuantitas' => $qty,
+            'sub_total' => 0,
+            'tanggal' => $this->tanggal,
+        ]);
 
-        DetailTransaksi::updateOrCreate(
-            ['transaksi_id' => $trx->id],
-            [
-                'barang_id' => $this->barang_id,
-                'kategori_id' => Kategori::where('name', $nama)->first()->id,
-                'value' => $totalHpp / $qty,
-                'kuantitas' => $qty,
-                'sub_total' => $totalHpp,
-            ],
-        );
+        // 🔥 FIFO OUT
+        $totalHpp = $this->fifo($this->barang_id, $qty, $detail->id, 'out', true);
+
+        $detail->update([
+            'value' => $totalHpp / $qty,
+            'sub_total' => $totalHpp,
+        ]);
+
+        $trx->update([
+            'total' => $totalHpp,
+        ]);
+
+        return $totalHpp;
     }
 };
 ?>

@@ -10,12 +10,14 @@ use App\Models\StokBatch;
 use Mary\Traits\Toast;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 
 new class extends Component {
     use Toast;
 
     #[Rule('required|unique:transaksis,invoice')]
     public string $invoice = '';
+
     public string $invoice2 = '';
 
     #[Rule('required')]
@@ -26,34 +28,22 @@ new class extends Component {
 
     public float $total = 0;
 
-    public ?float $uang = 0;
-
     #[Rule('required')]
     public ?string $tanggal = null;
-
-    #[Rule('required')]
-    public ?string $bayar = null;
 
     #[Rule('required|array|min:1')]
     public array $details = [];
 
     public $barangs;
 
-    /* =====================
-        WITH
-    ====================== */
     public function with(): array
     {
         return [
             'barangs' => $this->barangs,
             'clients' => Client::where('name', 'like', '%Kandang Kambing%')->get(),
-            'bayars' => [['id' => 'Cash', 'name' => 'Cash'], ['id' => 'Transfer', 'name' => 'Transfer']],
         ];
     }
 
-    /* =====================
-        MOUNT
-    ====================== */
     public function mount(): void
     {
         $this->user_id = auth()->id();
@@ -61,9 +51,6 @@ new class extends Component {
         $this->updatedTanggal($this->tanggal);
 
         $this->barangs = Barang::all();
-
-        $quest = Client::where('name', 'like', '%Quest%')->first();
-        $this->client_id = $quest?->id;
 
         $this->addDetail();
     }
@@ -77,38 +64,72 @@ new class extends Component {
         $this->invoice2 = "INV-$tanggal-HPP-$rand";
     }
 
-    /* =====================
-        DETAIL HANDLING
-    ====================== */
+    /* ===============================
+       HITUNG HPP FIFO (REAL)
+    =============================== */
+    private function getHppPreview($barang_id, $qty)
+    {
+        $batches = StokBatch::where('barang_id', $barang_id)->where('qty_sisa', '>', 0)->orderBy('tanggal')->orderBy('id')->get();
+
+        $sisa = $qty;
+        $totalHpp = 0;
+
+        foreach ($batches as $batch) {
+            if ($sisa <= 0) {
+                break;
+            }
+
+            $pakai = min($batch->qty_sisa, $sisa);
+            $totalHpp += $pakai * $batch->harga;
+
+            $sisa -= $pakai;
+        }
+
+        if ($qty > 0) {
+            return $totalHpp / $qty; // rata-rata HPP
+        }
+
+        return 0;
+    }
+
+    private function getMaxQty($barang_id)
+    {
+        return StokBatch::where('barang_id', $barang_id)->sum('qty_sisa');
+    }
+
+    /* ===============================
+       UPDATE DETAIL
+    =============================== */
     public function updatedDetails($value, $key): void
     {
         $index = explode('.', $key)[0];
 
-        /*
-    |--------------------------------------------------------------------------
-    | PILIH BARANG
-    |--------------------------------------------------------------------------
-    */
+        // PILIH BARANG
         if (str_ends_with($key, '.barang_id')) {
-            $barang = Barang::find($value);
+            $max = $this->getMaxQty($value);
 
-            if ($barang) {
-                $this->details[$index]['max_qty'] = $barang->stok;
-                $this->details[$index]['kuantitas'] = 0.01;
-                $this->details[$index]['value'] = $barang->hpp;
-            }
+            $this->details[$index]['max_qty'] = $max;
+            $this->details[$index]['kuantitas'] = 0.01;
+
+            $this->details[$index]['value'] = $this->getHppPreview($value, 0.01);
         }
 
-        /*
-    |--------------------------------------------------------------------------
-    | QTY
-    |--------------------------------------------------------------------------
-    */
+        // QTY
         if (str_ends_with($key, '.kuantitas')) {
-            $qty = max(0.01, (float) str_replace(',', '.', $value));
-            $max = $this->details[$index]['max_qty'] ?? $qty;
+            $qty = max(0.01, (float) $value);
+            $max = $this->details[$index]['max_qty'] ?? 0;
 
-            $this->details[$index]['kuantitas'] = min($qty, $max);
+            if ($qty > $max) {
+                $qty = $max;
+            }
+
+            $this->details[$index]['kuantitas'] = $qty;
+
+            $barang_id = $this->details[$index]['barang_id'] ?? null;
+
+            if ($barang_id) {
+                $this->details[$index]['value'] = $this->getHppPreview($barang_id, $qty);
+            }
         }
 
         $this->calculateTotal();
@@ -116,20 +137,15 @@ new class extends Component {
 
     private function calculateTotal(): void
     {
-        $this->total = collect($this->details)->sum(fn($i) => ($i['value'] ?? 0) * ($i['kuantitas'] ?? 1));
+        $this->total = collect($this->details)->sum(fn($i) => ($i['value'] ?? 0) * ($i['kuantitas'] ?? 0));
     }
 
-    /* =====================
-        SAVE
-    ====================== */
+    /* ===============================
+       SAVE TRANSAKSI
+    =============================== */
     public function save(): void
     {
-        $this->validate([
-            'client_id' => 'required',
-            'details' => 'required|array|min:1',
-            'details.*.barang_id' => 'required|exists:barangs,id',
-            'details.*.kuantitas' => 'required|numeric|min:0.01',
-        ]);
+        $this->validate();
 
         DB::transaction(function () {
             $penjualan = Transaksi::create([
@@ -140,38 +156,30 @@ new class extends Component {
                 'type' => 'Kredit',
                 'total' => $this->total,
                 'status' => 'Hutang',
-                'bayar' => $this->bayar,
-                'uang' => 0,
-                'kembalian' => max(0, $this->uang - $this->total),
+                'bayar' => 'Cash',
             ]);
 
             $totalHPP = 0;
             $hppPerBarang = [];
 
-            /** =========================
-             * DETAIL PENJUALAN + FIFO
-             ========================== */
             foreach ($this->details as $item) {
-                $barang = Barang::find($item['barang_id']);
-                $qtyJual = $item['kuantitas'];
+                $barang = Barang::findOrFail($item['barang_id']);
+                $qty = $item['kuantitas'];
 
-                // DETAIL PENJUALAN
-                $kategoriJual = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
+                $kategoriJual = Kategori::where('name', 'like', 'Penjualan%')->first();
 
                 DetailTransaksi::create([
                     'transaksi_id' => $penjualan->id,
                     'barang_id' => $barang->id,
-                    'kategori_id' => $kategoriJual->id,
-                    'value' => $item['value'],
-                    'kuantitas' => $qtyJual,
-                    'sub_total' => $item['value'] * $qtyJual,
+                    'kategori_id' => $kategoriJual->id ?? null,
+                    'value' => $item['value'], // HPP per unit
+                    'kuantitas' => $qty,
+                    'sub_total' => $item['value'] * $qty,
                 ]);
 
-                /** =========================
-                 * FIFO HPP
-                 ========================== */
+                // FIFO REAL
+                $sisa = $qty;
                 $hppBarang = 0;
-                $sisa = $qtyJual;
 
                 $batches = StokBatch::where('barang_id', $barang->id)->where('qty_sisa', '>', 0)->orderBy('tanggal')->orderBy('id')->lockForUpdate()->get();
 
@@ -182,28 +190,28 @@ new class extends Component {
 
                     $pakai = min($batch->qty_sisa, $sisa);
 
-                    $hppBatch = $pakai * $batch->harga;
-
-                    $hppBarang += $hppBatch;
-                    $totalHPP += $hppBatch;
+                    $hpp = $pakai * $batch->harga;
 
                     $batch->decrement('qty_sisa', $pakai);
+
+                    $hppBarang += $hpp;
                     $sisa -= $pakai;
                 }
 
                 if ($sisa > 0) {
-                    throw new \Exception("Stok FIFO {$barang->name} tidak mencukupi");
+                    throw new Exception("Stok tidak cukup untuk {$barang->name}");
                 }
 
-                $hppPerBarang[$barang->id] = [
+                $totalHPP += $hppBarang;
+
+                $hppPerBarang[] = [
+                    'barang_id' => $barang->id,
+                    'qty' => $qty,
                     'total' => $hppBarang,
-                    'qty' => $qtyJual,
                 ];
             }
 
-            /** =========================
-             * TRANSAKSI HPP
-             ========================== */
+            // TRANSAKSI HPP
             $hppTransaksi = Transaksi::create([
                 'invoice' => $this->invoice2,
                 'user_id' => $this->user_id,
@@ -212,43 +220,34 @@ new class extends Component {
                 'type' => 'Debit',
                 'total' => $totalHPP,
                 'status' => 'Hutang',
-                'bayar' => $this->bayar,
+                'bayar' => 'Cash',
             ]);
 
-            /** =========================
-             * DETAIL HPP PER BARANG
-             ========================== */
-            foreach ($hppPerBarang as $barangId => $data) {
-                $barang = Barang::find($barangId);
-
-                $kategoriHpp = Kategori::where('name', 'like', 'HPP %' . $barang->jenis->name)->first();
-
+            foreach ($hppPerBarang as $item) {
                 DetailTransaksi::create([
                     'transaksi_id' => $hppTransaksi->id,
-                    'barang_id' => $barang->id,
-                    'kategori_id' => $kategoriHpp->id,
-                    'value' => $data['total'] / $data['qty'], // HPP per unit FIFO
-                    'kuantitas' => $data['qty'],
-                    'sub_total' => $data['total'], // TOTAL HPP BARANG
+                    'barang_id' => $item['barang_id'],
+                    'value' => $item['total'] / $item['qty'],
+                    'kuantitas' => $item['qty'],
+                    'sub_total' => $item['total'],
                 ]);
             }
         });
 
-        $this->success('Transaksi berhasil dibuat!', redirectTo: '/bon-kandang');
+        $this->success('Transaksi berhasil!', redirectTo: '/bon-kandang');
     }
 
     public function addDetail(): void
     {
         $this->details[] = [
             'barang_id' => null,
-            'satuan' => null,
             'value' => 0,
             'kuantitas' => 0.01,
-            'max_qty' => null,
+            'max_qty' => 0,
         ];
     }
 
-    public function removeDetail(int $index): void
+    public function removeDetail($index): void
     {
         unset($this->details[$index]);
         $this->details = array_values($this->details);
@@ -323,8 +322,6 @@ new class extends Component {
                     <div class="border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-input label="Total Pembayaran" value="Rp {{ number_format($total, 0, '.', ',') }}" readonly
                             class="font-bold text-lg" />
-                        <x-select label="Metode Pembayaran" wire:model="bayar" :options="$bayars"
-                            placeholder="Pilih Metode" />
                     </div>
 
                 </div>
