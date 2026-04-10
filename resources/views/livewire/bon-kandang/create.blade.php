@@ -155,7 +155,7 @@ new class extends Component {
                 'client_id' => $this->client_id,
                 'type' => 'Kredit',
                 'total' => $this->total,
-                'status' => 'Hutang',
+                'status' => 'Lunas',
                 'bayar' => 'Cash',
             ]);
 
@@ -219,7 +219,7 @@ new class extends Component {
                 'client_id' => $this->client_id,
                 'type' => 'Debit',
                 'total' => $totalHPP,
-                'status' => 'Hutang',
+                'status' => 'Lunas',
                 'bayar' => 'Cash',
             ]);
 

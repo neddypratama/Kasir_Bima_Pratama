@@ -151,7 +151,6 @@ new class extends Component {
         return Transaksi::query()
             ->with(['client:id,name,keterangan', 'details.barang:id,name'])
             ->where('type', 'Kredit')
-            ->where('status', 'Hutang')
             ->when($this->barang_id, function (Builder $q) {
                 $q->whereHas('client', function ($q2) {
                     $q2->where('name', 'like', 'Kandang Kambing%');
