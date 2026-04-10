@@ -151,22 +151,27 @@ new class extends Component {
         return Transaksi::query()
             ->with(['client:id,name,keterangan', 'details.barang:id,name'])
             ->where('type', 'Kredit')
-            ->whereHas('client', function ($q2) {
-                $q2->where('name', 'like', 'Kandang Kambing%');
+
+            // --- TAMBAHKAN KODE INI ---
+            // Memfilter agar hanya client yang namanya berawalan 'Kandang Kambing'
+            ->whereHas('client', function (Builder $q) {
+                $q->where('name', 'like', 'Kandang Kambing%');
             })
+            // --------------------------
+
             // 🔍 SEARCH INVOICE
             ->when($this->search, function (Builder $q) {
                 $q->where('invoice', 'like', "%{$this->search}%");
             })
 
-            // 📦 FILTER BARANG (BENAR)
+            // 📦 FILTER BARANG
             ->when($this->barang_id, function (Builder $q) {
                 $q->whereHas('details', function ($q2) {
                     $q2->where('barang_id', $this->barang_id);
                 });
             })
 
-            // 👤 FILTER CLIENT
+            // 👤 FILTER CLIENT (Pilihan user di UI)
             ->when($this->client_id, fn(Builder $q) => $q->where('client_id', $this->client_id))
 
             // 📅 FILTER TANGGAL
