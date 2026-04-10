@@ -151,12 +151,9 @@ new class extends Component {
         return Transaksi::query()
             ->with(['client:id,name,keterangan', 'details.barang:id,name'])
             ->where('type', 'Kredit')
-            ->when($this->barang_id, function (Builder $q) {
-                $q->whereHas('client', function ($q2) {
-                    $q2->where('name', 'like', 'Kandang Kambing%');
-                });
+            ->whereHas('client', function ($q2) {
+                $q2->where('name', 'like', 'Kandang Kambing%');
             })
-
             // 🔍 SEARCH INVOICE
             ->when($this->search, function (Builder $q) {
                 $q->where('invoice', 'like', "%{$this->search}%");
@@ -265,7 +262,8 @@ new class extends Component {
                     @endif
                     @if (Auth::user()->role_id == 1 ||
                             (Carbon::parse($transaksi->tanggal)->isSameDay($this->today) && $transaksi->user_id == Auth::user()->id))
-                        <x-button icon="o-pencil" link="/bon-kandang/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
+                        <x-button icon="o-pencil"
+                            link="/bon-kandang/{{ $transaksi->id }}/edit?invoice={{ $transaksi->invoice }}"
                             class="btn-ghost btn-sm text-yellow-500" tooltip="Edit" />
                     @endif
                 </div>
