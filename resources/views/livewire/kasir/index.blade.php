@@ -203,7 +203,7 @@ new class extends Component {
         return [
             'transaksi' => $this->transaksi(),
             'barang' => Barang::all(),
-            'client' => Client::where('keterangan', 'Pembeli')->get(),
+            'client' => Client::where('keterangan', 'Pembeli')->where('name', 'not like', 'Kandang Kambing%')->get(),
             'headers' => $this->headers(),
             'perPage' => $this->perPage,
             'pages' => $this->page,
