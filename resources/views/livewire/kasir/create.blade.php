@@ -214,6 +214,16 @@ new class extends Component {
                     $totalHPP += $hppBatch;
 
                     $batch->decrement('qty_sisa', $pakai);
+
+                    // 🔥 SIMPAN KE PENJUALAN ASLI (INI KUNCI)
+                    \App\Models\StokKeluarBatch::create([
+                        'detail_transaksi_id' => $item->id, // ✅ PENJUALAN
+                        'stok_batch_id' => $batch->id,
+                        'qty' => $pakai,
+                        'returned_qty' => 0,
+                        'harga' => $batch->harga,
+                    ]);
+
                     $sisa -= $pakai;
                 }
 

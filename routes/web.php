@@ -127,6 +127,11 @@ Route::middleware('auth')->group(function () {
         Volt::route('/lainnya/create', 'lainnya.create');
         Volt::route('/lainnya/{transaksi}/edit', 'lainnya.edit');
         Volt::route('/lainnya/{transaksi}/show', 'lainnya.show');
+
+        Volt::route('/return', 'return.index');
+        Volt::route('/return/create', 'return.create');
+        Volt::route('/return/{transaksi}/edit', 'return.edit');
+        Volt::route('/return/{transaksi}/show', 'return.show');
     });
 
     /*

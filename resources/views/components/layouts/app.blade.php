@@ -99,7 +99,6 @@
                     <x-menu-sub title="Manage Stok" icon="fas.warehouse">
                         {{-- <x-menu-item title="Laporan Stok" icon="fas.file" link="/pakan" /> --}}
                         <x-menu-item title="Perbaikan Stok" icon="fas.capsules" link="/stok" />
-                        <x-menu-item title="Penambahan Stok" icon="fas.capsules" link="/penambahan-stok" />
                     </x-menu-sub>
                 @endif
 
@@ -114,6 +113,7 @@
                     @if (in_array(auth()->user()->role_id, [1, 2]))
                         <x-menu-item title="Pembelian" icon="fas.sack-dollar" link="/supplier" />
                         <x-menu-item title="Pengeluaran" icon="fas.money-bill" link="/keluar" />
+                        <x-menu-item title="Retur" icon="fas.arrow-rotate-left" link="/return" />
                         <x-menu-item title="Pendapatan Lain" icon="fas.circle-dollar-to-slot" link="/lainnya" />
                     @endif
                 </x-menu-sub>
