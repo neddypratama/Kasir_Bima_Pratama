@@ -166,7 +166,7 @@ new class extends Component {
                 $barang = Barang::findOrFail($item['barang_id']);
                 $qty = $item['kuantitas'];
 
-                $kategoriJual = Kategori::where('name', 'like', 'Penjualan%')->first();
+                $kategoriJual = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
 
                 DetailTransaksi::create([
                     'transaksi_id' => $penjualan->id,
@@ -223,13 +223,18 @@ new class extends Component {
                 'bayar' => 'Cash',
             ]);
 
-            foreach ($hppPerBarang as $item) {
+            foreach ($hppPerBarang as $barangId => $data) {
+                $barang = Barang::find($barangId);
+
+                $kategoriHpp = Kategori::where('name', 'like', 'HPP %' . $barang->jenis->name)->first();
+
                 DetailTransaksi::create([
                     'transaksi_id' => $hppTransaksi->id,
-                    'barang_id' => $item['barang_id'],
-                    'value' => $item['total'] / $item['qty'],
-                    'kuantitas' => $item['qty'],
-                    'sub_total' => $item['total'],
+                    'barang_id' => $barang->id,
+                    'kategori_id' => $kategoriHpp->id,
+                    'value' => $data['total'] / $data['qty'], // HPP per unit FIFO
+                    'kuantitas' => $data['qty'],
+                    'sub_total' => $data['total'], // TOTAL HPP BARANG
                 ]);
             }
         });

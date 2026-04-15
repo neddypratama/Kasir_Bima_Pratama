@@ -112,7 +112,6 @@
             foreach (array_keys($this->pengeluaranData) as $k) {
                 $this->expanded[$k] = false;
             }
-            // dd($this->pendapatanData, $this->pengeluaranData);
         }
     
         public function with(): array

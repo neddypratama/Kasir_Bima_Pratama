@@ -230,9 +230,9 @@ new class extends Component {
                     'transaksi_id' => $this->hpp->id,
                     'barang_id' => $barang->id,
                     'kategori_id' => $kategoriHpp->id,
-                    'value' => $data['total'] / $data['qty'], // FIFO UNIT COST
+                    'value' => $data['total'] / $data['qty'], // HPP per unit FIFO
                     'kuantitas' => $data['qty'],
-                    'sub_total' => $data['total'],
+                    'sub_total' => $data['total'], // TOTAL HPP BARANG
                 ]);
             }
         });

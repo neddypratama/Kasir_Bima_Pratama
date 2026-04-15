@@ -167,62 +167,80 @@ new class extends Component {
 
 <div class="p-4 space-y-6">
 
-    <x-header title="Daftar Transaksi Pakan" separator />
-    <!-- FILTER BAR -->
-    <div class="grid grid-cols-1 md:grid-cols-8 gap-4 mb-4">
+    <x-header title="Daftar Transaksi Pakan" progress-indicator separator>
+        <x-slot:actions>
+            <x-button wire:click="openExportModal" icon="fas.download" primary>
+                Export Excel
+            </x-button>
+        </x-slot:actions>
+    </x-header>
 
-        <x-select label="Show" :options="$pages" wire:model.live="perPage" />
-
-        <div class="md:col-span-6">
-            <x-input wire:model.live.debounce="search" placeholder="Cari Invoice..." clearable />
+    {{-- FILTER BAR --}}
+    <div class="grid grid-cols-1 md:grid-cols-8 gap-4 items-end mb-4">
+        <div class="md:col-span-1">
+            <x-select label="Show" :options="$pages" wire:model.live="perPage" />
         </div>
 
-        <x-button label="Filters" @click="$wire.drawer = true" badge="{{ $this->filter }}" />
+        <div class="md:col-span-6">
+            <x-input placeholder="Cari Invoice..." wire:model.live.debounce="search" clearable
+                icon="o-magnifying-glass" />
+        </div>
+
+        <div class="md:col-span-1">
+            <x-button label="Filters" @click="$wire.drawer = true" responsive icon="o-funnel"
+                badge="{{ $this->filter }}" badge-classes="badge-primary" />
+        </div>
     </div>
 
-    <!-- TABLE -->
-    <x-card>
-        <x-table :headers="$headers" :rows="$transaksi" with-pagination>
-            @scope('cell_status', $row)
-                <span class="badge 
-                    {{ $row->status == 'Lunas' ? 'badge-success' : 'badge-error' }}">
-                    {{ $row->status }}
-                </span>
+    {{-- TABLE --}}
+    <x-card class="overflow-x-auto">
+        <x-table :headers="$headers" :rows="$transaksi" :sort-by="$sortBy" with-pagination
+            link="transaksis/{id}/show?invoice={invoice}">
+            @scope('cell_status', $transaksi)
+                @if ($transaksi->status == 'Lunas')
+                    <span class="badge badge-success">{{ $transaksi->status }}</span>
+                @elseif ($transaksi->status == 'Hutang')
+                    <span class="badge badge-error">{{ $transaksi->status }}</span>
+                @else
+                    <span class="badge badge-ghost">{{ $transaksi->status }}</span>
+                @endif
             @endscope
+
         </x-table>
     </x-card>
 
-    <!-- FILTER DRAWER -->
-    <x-drawer wire:model="drawer" right title="Filter">
-
-        <x-select label="Client" :options="$clients" wire:model.live="client_id" placeholder="Semua" />
-        <x-select label="User" :options="$users" wire:model.live="user_id" placeholder="Semua" />
-        <x-select label="Status" :options="$statuses" wire:model.live="status_id" placeholder="Semua" />
-
-        <!-- 🔥 FILTER KATEGORI -->
-        <x-select label="Kategori" :options="$kategoris" wire:model.live="kategori_name" placeholder="Semua" />
-
-        <x-input type="date" wire:model.live="startDate" label="Dari" />
-        <x-input type="date" wire:model.live="endDate" label="Sampai" />
+    {{-- FILTER DRAWER --}}
+    <x-drawer wire:model="drawer" right separator title="Filter Data" with-close-button class="lg:w-1/3">
+        <div class="grid gap-2">
+            <x-select label="Client" :options="$clients" wire:model.live="client_id" placeholder="Semua"
+                placeholder-value="" />
+            <x-select label="User" :options="$users" wire:model.live="user_id" placeholder="Semua"
+                placeholder-value="" />
+            <x-select label="Status" :options="$statuses" wire:model.live="status_id" placeholder="Semua"
+                placeholder-value="" />
+            <!-- 🔥 FILTER KATEGORI -->
+            <x-select label="Kategori" :options="$kategoris" wire:model.live="kategori_name" placeholder="Semua" />
+            <x-input label="Dari" type="date" wire:model.live="startDate" />
+            <x-input label="Sampai" type="date" wire:model.live="endDate" />
+        </div>
 
         <x-slot:actions>
-            <x-button wire:click="clear">Reset</x-button>
-            <x-button class="btn-primary" @click="$wire.drawer=false">Apply</x-button>
+            <x-button wire:click="clear" icon="o-x-mark">Reset Filter</x-button>
+            <x-button @click="$wire.drawer=false" class="btn-primary" icon="o-check">Selesai</x-button>
         </x-slot:actions>
-
     </x-drawer>
 
-    <!-- EXPORT -->
-    <x-modal wire:model="exportModal" title="Export">
-
-        <x-input type="date" wire:model="startDate" label="Dari" />
-        <x-input type="date" wire:model="endDate" label="Sampai" />
+    {{-- EXPORT MODAL --}}
+    <x-modal wire:model="exportModal" separator title="Export Penjualan">
+        <div class="grid gap-4">
+            <x-input label="Dari Tanggal" type="date" wire:model="startDate" />
+            <x-input label="Sampai Tanggal" type="date" wire:model="endDate" />
+        </div>
 
         <x-slot:actions>
             <x-button @click="$wire.exportModal=false">Batal</x-button>
-            <x-button wire:click="export" class="btn-primary">Export</x-button>
+            <x-button wire:click="export" class="btn-primary">Export Data</x-button>
         </x-slot:actions>
-
     </x-modal>
 
 </div>
