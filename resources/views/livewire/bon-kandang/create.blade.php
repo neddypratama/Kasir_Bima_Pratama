@@ -224,8 +224,8 @@ new class extends Component {
             ]);
 
             foreach ($hppPerBarang as $barangId => $data) {
-                $barang = Barang::find($barangId);
-
+                $barang = Barang::find($data['barang_id']);
+                
                 $kategoriHpp = Kategori::where('name', 'like', 'HPP %' . $barang->jenis->name)->first();
 
                 DetailTransaksi::create([
