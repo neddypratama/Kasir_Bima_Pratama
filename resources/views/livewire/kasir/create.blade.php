@@ -184,7 +184,7 @@ new class extends Component {
                 // DETAIL PENJUALAN
                 $kategoriJual = Kategori::where('name', 'like', 'Penjualan %' . $barang->jenis->name)->first();
 
-                DetailTransaksi::create([
+                $detail = DetailTransaksi::create([
                     'transaksi_id' => $penjualan->id,
                     'barang_id' => $barang->id,
                     'kategori_id' => $kategoriJual->id,
@@ -217,7 +217,7 @@ new class extends Component {
 
                     // 🔥 SIMPAN KE PENJUALAN ASLI (INI KUNCI)
                     \App\Models\StokKeluarBatch::create([
-                        'detail_transaksi_id' => $item->id, // ✅ PENJUALAN
+                        'detail_transaksi_id' => $detail->id, // ✅ PENJUALAN
                         'stok_batch_id' => $batch->id,
                         'qty' => $pakai,
                         'returned_qty' => 0,
