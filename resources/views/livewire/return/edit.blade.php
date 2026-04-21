@@ -183,7 +183,7 @@ new class extends Component {
 
 <div class="p-4 space-y-6">
 
-    <x-header title="Edit Retur Penjualan" separator />
+    <x-header title="Edit Retur Pembelian" separator />
 
     <x-form wire:submit="save">
 

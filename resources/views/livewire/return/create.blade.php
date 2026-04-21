@@ -2,6 +2,7 @@
 
 use Livewire\Volt\Component;
 use App\Models\Transaksi;
+use App\Models\Barang;
 use App\Models\StokBatch;
 use App\Models\DetailTransaksi;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ new class extends Component {
     {
         $this->tanggal = now()->format('Y-m-d\TH:i:s');
 
-        $this->transaksis = Transaksi::where('type', 'Kredit')->where('status', '!=', 'Batal')->get()->map(
+        $this->transaksis = Transaksi::where('type', 'Stok')->where('status', '!=', 'Batal')->where('status', '!=', 'Hutang')->get()->map(
             fn($t) => [
                 'id' => $t->id,
                 'name' => $t->invoice . ' - ' . \Carbon\Carbon::parse($t->tanggal)->format('d-m-Y H:i:s'),
@@ -57,7 +58,6 @@ new class extends Component {
         $str = substr($transaksi->invoice, -4);
         $tanggal = now()->format('Ymd');
 
-        $this->hpp = Transaksi::with('details')->where('invoice', 'like', "%-$tanggal-HPP-$str")->first();
         $this->invoice = 'INV-' . $tanggal . '-RTN-' . Str::upper(Str::random(4));
 
         $this->tanggal = now()->format('Y-m-d\TH:i:s');
@@ -113,115 +113,93 @@ new class extends Component {
 
     /* ===================== */
     public function save()
-{
-    DB::transaction(function () {
-
-        /** =========================
-         * TRANSAKSI RETUR
-         ========================== */
-        $retur = Transaksi::create([
-            'invoice' => $this->invoice,
-            'name' => $this->name,
-            'tanggal' => $this->tanggal,
-            'client_id' => $this->client_id,
-            'user_id' => $this->user_id,
-            'type' => 'Debit',
-            'total' => $this->total,
-            'status' => 'Lunas',
-        ]);
-
-        $dataHPP = [];
-        $totalHPP = 0;
-
-        foreach ($this->details as $item) {
-
-            if ($item['kuantitas'] <= 0) continue;
-
+    {
+        DB::transaction(function () {
             /** =========================
-             * SIMPAN DETAIL RETUR
+             * TRANSAKSI RETUR
              ========================== */
-            $detail = DetailTransaksi::create([
-                'transaksi_id' => $retur->id,
-                'barang_id' => $item['barang_id'],
-                'kategori_id' => $item['kategori_id'],
-                'value' => $item['value'],
-                'kuantitas' => $item['kuantitas'],
-                'sub_total' => $item['kuantitas'] * $item['value'],
-            ]);
-
-            /** =========================
-             * BALIKKAN STOK (BATCH BARU)
-             ========================== */
-            StokBatch::create([
-                'barang_id' => $item['barang_id'],
-                'user_id' => $this->user_id,
-                'detail_transaksi_id' => $detail->id,
+            $retur = Transaksi::create([
+                'invoice' => $this->invoice,
+                'name' => $this->name,
                 'tanggal' => $this->tanggal,
-                'qty_masuk' => $item['kuantitas'],   // ✅ FIX
-                'qty_sisa' => $item['kuantitas'],    // ✅ FIX
-                'harga' => $item['value'],           // ✅ FIX (per unit)
+                'client_id' => $this->client_id,
+                'user_id' => $this->user_id,
+                'type' => 'Kredit',
+                'total' => $this->total,
+                'status' => 'Lunas',
             ]);
 
-            /** =========================
-             * HPP
-             ========================== */
-            $dataHPP[] = [
-                'barang_id' => $item['barang_id'],
-                'kategori_id' => $item['kategori_id'],
-                'value' => $item['value'], // asumsi HPP = harga jual (simple mode)
-                'kuantitas' => $item['kuantitas'],
-            ];
+            $dataHPP = [];
+            $totalHPP = 0;
 
-            $totalHPP += $item['value'] * $item['kuantitas'];
-        }
+            foreach ($this->details as $item) {
+                if ($item['kuantitas'] <= 0) {
+                    continue;
+                }
 
-        /** =========================
-         * TRANSAKSI HPP
-         ========================== */
-        $hpp = Transaksi::create([
-            'invoice' => 'HPP-' . $this->invoice,
-            'name' => 'HPP Retur ' . $this->invoice,
-            'tanggal' => $this->tanggal,
-            'client_id' => $this->client_id,
-            'user_id' => $this->user_id,
-            'type' => 'Kredit',
-            'total' => $totalHPP,
-            'status' => 'Lunas',
-        ]);
+                /** =========================
+                 * SIMPAN DETAIL RETUR
+                 ========================== */
+                $detail = DetailTransaksi::create([
+                    'transaksi_id' => $retur->id,
+                    'barang_id' => $item['barang_id'],
+                    'kategori_id' => $item['kategori_id'],
+                    'value' => $item['value'],
+                    'kuantitas' => $item['kuantitas'],
+                    'sub_total' => $item['kuantitas'] * $item['value'],
+                ]);
 
-        foreach ($dataHPP as $value) {
+                $sisa = $item['kuantitas'];
+                $barang = Barang::find($item['barang_id']);
+                $batches = StokBatch::where('barang_id', $barang->id)->where('qty_sisa', '>', 0)->orderBy('tanggal')->orderBy('id')->lockForUpdate()->get();
 
-            DetailTransaksi::create([
-                'transaksi_id' => $hpp->id,
-                'barang_id' => $value['barang_id'],
-                'kategori_id' => $value['kategori_id'],
-                'value' => $value['value'],
-                'kuantitas' => $value['kuantitas'],
-                'sub_total' => $value['kuantitas'] * $value['value'],
-            ]);
-        }
-    });
+                foreach ($batches as $batch) {
+                    if ($sisa <= 0) {
+                        break;
+                    }
 
-    $this->success('Retur berhasil', redirectTo: '/return');
-}
+                    $pakai = min($batch->qty_sisa, $sisa);
+
+                    $batch->decrement('qty_sisa', $pakai);
+
+                    // 🔥 SIMPAN KE Pembelian ASLI (INI KUNCI)
+                    \App\Models\StokKeluarBatch::create([
+                        'detail_transaksi_id' => $detail->id, // ✅ Pembelian
+                        'stok_batch_id' => $batch->id,
+                        'qty' => $pakai,
+                        'returned_qty' => 0,
+                        'harga' => $batch->harga,
+                    ]);
+
+                    $sisa -= $pakai;
+                }
+
+                if ($sisa > 0) {
+                    throw new \Exception("Stok FIFO {$barang->name} tidak mencukupi");
+                }
+            }
+        });
+
+        $this->success('Retur berhasil', redirectTo: '/return');
+    }
 };
 ?>
 <div class="p-4 space-y-6">
 
-    <x-header title="Create Retur Penjualan" separator progress-indicator />
+    <x-header title="Create Retur Pembelian" separator progress-indicator />
 
     <x-form wire:submit="save">
 
         <x-card>
             <div class="grid lg:grid-cols-8 gap-4">
                 <div class="col-span-2">
-                    <x-header title="Pilih Transaksi" subtitle="Pilih transaksi penjualan terlebih dahulu"
+                    <x-header title="Pilih Transaksi" subtitle="Pilih transaksi pembelian terlebih dahulu"
                         size="text-2xl" />
                 </div>
 
                 <div class="col-span-6">
                     <x-choices-offline wire:model.live="transaksis_id" label="Transaksi" :options="$transaksis"
-                        placeholder="Pilih Transaksi Penjualan" single searchable clearable />
+                        placeholder="Pilih Transaksi Pembelian" single searchable clearable />
                 </div>
             </div>
         </x-card>
@@ -276,7 +254,7 @@ new class extends Component {
         </x-card>
 
         <x-slot:actions>
-            <x-button label="Cancel" link="/telur-return" />
+            <x-button label="Cancel" link="/return" />
             <x-button label="Save" type="submit" class="btn-primary" />
         </x-slot:actions>
 

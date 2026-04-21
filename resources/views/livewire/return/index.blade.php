@@ -96,194 +96,6 @@ new class extends Component {
         $this->statusModal = true;
     }
 
-    public function updateStatus(): void
-    {
-        DB::transaction(function () {
-            $transaksi = Transaksi::findOrFail($this->selectedId);
-            $detailRetur = $transaksi->details()->get();
-
-            if ($this->status == 'Selesai') {
-                $transaksi->update(['status' => 'Selesai']);
-
-                // =============================
-                // GENERATE INVOICE
-                // =============================
-                $str = substr($transaksi->invoice, -4);
-                $part = explode('-', $transaksi->invoice);
-                $tanggal = $part[1];
-
-                $invoiceBon = 'INV-' . $tanggal . '-BON-' . $str;
-                $invoiceStok = 'INV-' . $tanggal . '-STR-' . $str;
-                $invoiceHpp = 'INV-' . $tanggal . '-HPP-' . $str;
-
-                // =============================
-                // KATEGORI
-                // =============================
-                $kategoriStok = Kategori::where('name', 'Stok Pakan')->first();
-                $kategoriHpp = Kategori::where('name', 'HPP')->first();
-                $kategoriBon = Kategori::where('name', 'like', 'Piutang Peternak')->first();
-
-                // =============================
-                // BUAT BON
-                // =============================
-                $bon = Transaksi::create([
-                    'invoice' => $invoiceBon,
-                    'name' => $transaksi->name,
-                    'user_id' => $transaksi->user_id,
-                    'tanggal' => $transaksi->tanggal,
-                    'client_id' => $transaksi->client_id,
-                    'type' => 'Kredit',
-                    'total' => $transaksi->total,
-                    'status' => 'Selesai',
-                ]);
-
-                // =============================
-                // AMBIL TRANSAKSI PENJUALAN
-                // =============================
-                $parentInvoice = str_replace('Retur dari ', '', $transaksi->name);
-
-                $transaksiJual = Transaksi::where('invoice', $parentInvoice)->firstOrFail();
-
-                $detailJuals = DetailTransaksi::where('transaksi_id', $transaksiJual->id)->get();
-
-                $totalHPP = 0;
-                $hppPerBarang = [];
-
-                // =============================
-                // LOOP RETUR
-                // =============================
-                foreach ($detailJuals as $item) {
-                    $barang = Barang::find($item->barang_id);
-
-                    // 🔥 ambil qty dari RETUR
-                    $returItem = $detailRetur->firstWhere('barang_id', $item->barang_id);
-
-                    if (!$returItem) {
-                        continue;
-                    }
-
-                    $qtyRetur = $returItem->kuantitas;
-
-                    // =============================
-                    // SIMPAN KE BON
-                    // =============================
-                    DetailTransaksi::create([
-                        'transaksi_id' => $bon->id,
-                        'kategori_id' => $kategoriBon->id,
-                        'value' => $item->value,
-                        'barang_id' => $item->barang_id,
-                        'kuantitas' => $qtyRetur,
-                        'sub_total' => $item->value * $qtyRetur,
-                    ]);
-
-                    // =============================
-                    // FIFO RETUR
-                    // =============================
-                    $hppBarang = 0;
-                    $sisa = $qtyRetur;
-
-                    $keluarBatches = StokKeluarBatch::where('detail_transaksi_id', $item->id)->orderByDesc('id')->get();
-
-                    foreach ($keluarBatches as $keluar) {
-                        if ($sisa <= 0) {
-                            break;
-                        }
-
-                        $batch = StokBatch::find($keluar->stok_batch_id);
-
-                        $available = $keluar->qty - $keluar->returned_qty;
-
-                        if ($available <= 0) {
-                            continue;
-                        }
-
-                        $ambil = min($available, $sisa);
-
-                        $hppBatch = $ambil * $keluar->harga;
-
-                        $hppBarang += $hppBatch;
-                        $totalHPP += $hppBatch;
-
-                        // 🔥 BALIKKAN STOK
-                        $batch->increment('qty_sisa', $ambil);
-
-                        // 🔥 CATAT RETUR
-                        $keluar->increment('returned_qty', $ambil);
-
-                        $sisa -= $ambil;
-                    }
-
-                    if ($sisa > 0) {
-                        throw new \Exception("Qty retur {$barang->name} melebihi penjualan");
-                    }
-
-                    $hppPerBarang[$barang->id] = [
-                        'total' => $hppBarang,
-                        'qty' => $qtyRetur,
-                    ];
-                }
-
-                // =============================
-                // BUAT HPP
-                // =============================
-                $hpp = Transaksi::create([
-                    'invoice' => $invoiceHpp,
-                    'name' => $transaksi->name,
-                    'user_id' => $transaksi->user_id,
-                    'tanggal' => $transaksi->tanggal,
-                    'client_id' => $transaksi->client_id,
-                    'type' => 'Kredit',
-                    'total' => $totalHPP,
-                    'status' => 'Selesai',
-                ]);
-
-                foreach ($hppPerBarang as $barangId => $data) {
-                    DetailTransaksi::create([
-                        'transaksi_id' => $hpp->id,
-                        'barang_id' => $barangId,
-                        'kategori_id' => $kategoriHpp->id,
-                        'value' => $data['total'] / $data['qty'],
-                        'kuantitas' => $data['qty'],
-                        'sub_total' => $data['total'],
-                    ]);
-                }
-
-                // =============================
-                // BUAT STOK MASUK (RETUR)
-                // =============================
-                $stok = Transaksi::create([
-                    'invoice' => $invoiceStok,
-                    'name' => $transaksi->name,
-                    'user_id' => $transaksi->user_id,
-                    'tanggal' => $transaksi->tanggal,
-                    'client_id' => $transaksi->client_id,
-                    'type' => 'Debit',
-                    'total' => $totalHPP,
-                    'status' => 'Selesai',
-                ]);
-
-                foreach ($hppPerBarang as $barangId => $data) {
-                    DetailTransaksi::create([
-                        'transaksi_id' => $stok->id,
-                        'barang_id' => $barangId,
-                        'kategori_id' => $kategoriStok->id,
-                        'value' => $data['total'] / $data['qty'],
-                        'kuantitas' => $data['qty'],
-                        'sub_total' => $data['total'],
-                    ]);
-                }
-
-                $this->success("Status transaksi {$transaksi->invoice} berhasil diubah menjadi Selesai", position: 'toast-top');
-            } else {
-                $transaksi->update(['status' => 'Batal']);
-
-                $this->success("Status transaksi {$transaksi->invoice} berhasil diubah menjadi Batal", position: 'toast-top');
-            }
-        });
-
-        $this->statusModal = false;
-    }
-
     public function headers(): array
     {
         return [['key' => 'invoice', 'label' => 'Invoice', 'class' => 'w-24'], ['key' => 'name', 'label' => 'Rincian', 'class' => 'w-48'], ['key' => 'tanggal', 'label' => 'Tanggal', 'class' => 'w-16'], ['key' => 'client.name', 'label' => 'Client', 'class' => 'w-16'], ['key' => 'total', 'label' => 'Total', 'class' => 'w-24', 'format' => ['currency', 0, 'Rp']]];
@@ -293,9 +105,9 @@ new class extends Component {
     {
         return Transaksi::query()
             ->with(['client:id,name', 'details.kategori:id,name'])
-            ->where('type', 'Debit')
+            ->where('type', 'Kredit')
             ->whereHas('details.kategori', function (Builder $q) {
-                $q->where('name', 'like', 'Penjualan %');
+                $q->where('name', 'like', 'Stok %');
             })
             ->when($this->search, function (Builder $q) {
                 $q->where(function ($query) {
@@ -383,7 +195,7 @@ new class extends Component {
 
     <x-card class="overflow-x-auto">
         <x-table :headers="$headers" :rows="$transaksi" :sort-by="$sortBy" with-pagination
-            link="sentrat-return/{id}/show?invoice={invoice}">
+            link="return/{id}/show?invoice={invoice}">
             @scope('cell-kategori.name', $transaksi)
                 {{ $transaksi->kategori?->name ?? '-' }}
             @endscope   
