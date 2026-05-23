@@ -119,8 +119,8 @@ new class extends Component {
         // dd($this->bonData, $this->hutangData, $this->stokData, $laporans);
 
         /* =====================================================
-    3. AMBIL NILAI TRANSAKSI
-===================================================== */
+            3. AMBIL NILAI TRANSAKSI
+        ===================================================== */
         $rows = DB::table('detail_transaksis as dt')
             ->join('kategoris as k', 'k.id', '=', 'dt.kategori_id')
             ->join('laporans as l', 'l.id', '=', 'k.laporan_id')
@@ -131,17 +131,17 @@ new class extends Component {
             ->get();
 
         /* =====================================================
-    4. ISI NILAI KE STRUKTUR (TRANSFORM NAMA)
-===================================================== */
+            4. ISI NILAI KE STRUKTUR (TRANSFORM NAMA)
+        ===================================================== */
         foreach ($rows as $row) {
             $laporan = $row->laporan;
             $kategori = $row->kategori;
             $nilai = (float) $row->total;
 
             /* ======================
-        PENJUALAN → BON
-        Kredit + Hutang
-    ====================== */
+                PENJUALAN → BON
+                Kredit + Hutang
+            ====================== */
             if ($row->type === 'Pendapatan' && $row->transaksi_type === 'Kredit' && $row->status === 'Hutang') {
                 if (Str::startsWith($laporan, 'Penjualan ')) {
                     $laporan = 'Bon ' . Str::after($laporan, 'Penjualan ');
@@ -155,17 +155,40 @@ new class extends Component {
                 $this->bonData[$laporan]['total'] += $nilai;
             }
 
-            /* ======================
-        STOK LUNAS → ASET
-    ====================== */
-            if ($row->type === 'Aset' && $row->transaksi_type === 'Stok' && $row->status === 'Lunas') {
-                $this->stokData[$laporan]['detail'][$kategori] += $nilai;
-                $this->stokData[$laporan]['total'] += $nilai;
+            /* =====================================================
+                5. HITUNG STOK REAL PER JENIS BARANG
+            ===================================================== */
+            $this->stokData = []; // reset
+
+            $stokReal = DB::table('stok_batches as sb')
+                ->join('barangs as b', 'b.id', '=', 'sb.barang_id')
+                ->leftJoin('jenis_barangs as j', 'j.id', '=', 'b.jenis_id')
+                ->select(
+                    'b.name as barang',
+                    'j.name as jenis',
+                    DB::raw('SUM(sb.qty_sisa) as qty'),
+                    DB::raw('SUM(sb.qty_sisa * sb.harga) / SUM(sb.qty_sisa) as harga'), // HPP rata-rata
+                )
+                ->where('sb.qty_sisa', '>', 0)
+                ->groupBy('b.name', 'j.name')
+                ->get();
+
+            foreach ($stokReal as $stok) {
+                $total = $stok->qty * $stok->harga;
+
+                // kalau tidak ada jenis
+                $jenis = $stok->jenis ? 'Stok ' . $stok->jenis : 'Stok Lainnya';
+
+                // isi detail (per barang)
+                $this->stokData[$jenis]['detail'][$stok->barang] = $total;
+
+                // total per jenis
+                $this->stokData[$jenis]['total'] = ($this->stokData[$jenis]['total'] ?? 0) + $total;
             }
 
             /* ======================
-        STOK HUTANG → HUTANG
-    ====================== */
+                STOK HUTANG → HUTANG
+            ====================== */
             if ($row->type === 'Aset' && $row->transaksi_type === 'Stok' && $row->status === 'Hutang') {
                 if (Str::startsWith($laporan, 'Stok ')) {
                     $laporan = 'Hutang ' . Str::after($laporan, 'Stok ');
